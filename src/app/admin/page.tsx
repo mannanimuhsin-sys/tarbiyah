@@ -339,10 +339,12 @@ export default function AdminPage() {
       setSettingsSaving(false);
 
       if (res.ok && data.success) {
+        // Update local state with saved data so header/WhatsApp button reflect changes immediately
+        if (data.settings) setSettings(data.settings);
         setSettingsSaved(true);
         setTimeout(() => setSettingsSaved(false), 3000);
       } else {
-        alert("സെറ്റിംഗ്സ് സേവ് ചെയ്യാൻ സാധിച്ചില്ല.");
+        alert(data.error || "സെറ്റിംഗ്സ് സേവ് ചെയ്യാൻ സാധിച്ചില്ല.");
       }
     } catch (err) {
       setSettingsSaving(false);

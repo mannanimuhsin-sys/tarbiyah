@@ -9,7 +9,7 @@ export function WhatsAppButton() {
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
   const [madrasaName, setMadrasaName] = useState<string>('Tarbiyah');
 
-  useEffect(() => {
+  const fetchSettings = () => {
     fetch('/api/settings')
       .then(r => r.json())
       .then(d => {
@@ -19,6 +19,19 @@ export function WhatsAppButton() {
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchSettings();
+    // Re-fetch when tab becomes visible again (e.g. after admin saves in another tab)
+    const handleFocus = () => fetchSettings();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') fetchSettings();
+    });
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Clean phone number (strip spaces, dashes, parentheses)
