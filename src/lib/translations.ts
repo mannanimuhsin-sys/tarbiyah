@@ -32,7 +32,6 @@ export const translations = {
       rejectedNotice: "Your registration was not approved. Please contact the administration.",
       alreadyRegistered: "Already registered? Login here",
       dontHaveAccount: "Don't have an account? Register now",
-      adminCredentialsHint: "Admin login: admin / 4321",
     },
     registration: {
       title: "New Student Enrollment",
@@ -151,7 +150,6 @@ export const translations = {
       rejectedNotice: "നിങ്ങളുടെ അപേക്ഷ അംഗീകരിക്കപ്പെട്ടില്ല. ദയവായി ഓഫീസുമായി ബന്ധപ്പെടുക.",
       alreadyRegistered: "ഇതിനകം അക്കൗണ്ട് ഉണ്ടോ? ഇവിടെ ലോഗിൻ ചെയ്യുക",
       dontHaveAccount: "അക്കൗണ്ട് ഇല്ലേ? ഇപ്പോൾ രജിസ്റ്റർ ചെയ്യുക",
-      adminCredentialsHint: "അഡ്മിൻ ലോഗിൻ: admin / 4321",
     },
     registration: {
       title: "പുതിയ വിദ്യാർത്ഥി പ്രവേശനം",

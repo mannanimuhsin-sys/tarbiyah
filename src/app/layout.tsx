@@ -6,6 +6,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { InstallPWA } from '@/components/common/InstallPWA';
+import { BottomNav } from '@/components/layout/BottomNav';
 
 export const metadata: Metadata = {
   title: 'Tarbiyah - Premium Islamic Education Platform',
@@ -44,9 +45,10 @@ export default function RootLayout({
           <LanguageProvider>
             <AuthProvider>
               <Navbar />
-              <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-6">
                 {children}
               </main>
+              <BottomNav />
               <InstallPWA />
               <Footer />
             </AuthProvider>

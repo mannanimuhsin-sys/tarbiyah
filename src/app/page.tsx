@@ -75,7 +75,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 px-4 py-3.5 rounded-xl font-semibold text-xs text-gold-300/80 hover:text-gold-200 hover:underline"
             >
               <ShieldCheck className="w-4 h-4 text-gold-400" />
-              <span>Admin Portal (admin / 4321)</span>
+              <span>Admin Portal</span>
             </Link>
           </div>
         </div>

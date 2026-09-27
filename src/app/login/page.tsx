@@ -15,7 +15,8 @@ import {
   AlertCircle, 
   ArrowRight,
   Clock,
-  Sparkles
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -25,8 +26,9 @@ export default function LoginPage() {
 
   const [activeTab, setActiveTab] = useState<'student' | 'admin'>('student');
   const [mobileNumber, setMobileNumber] = useState('');
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingWarning, setPendingWarning] = useState<string | null>(null);
@@ -57,24 +59,6 @@ export default function LoginPage() {
       } else {
         setError(res.error || "Invalid Admin Credentials");
       }
-    }
-  };
-
-  const setDemoCredentials = (role: 'approved_student' | 'pending_student' | 'admin') => {
-    setError(null);
-    setPendingWarning(null);
-    if (role === 'admin') {
-      setActiveTab('admin');
-      setUsername('admin');
-      setPassword('4321');
-    } else if (role === 'approved_student') {
-      setActiveTab('student');
-      setMobileNumber('9876543210'); // Zayd Muhammad (Approved)
-      setPassword('password123');
-    } else if (role === 'pending_student') {
-      setActiveTab('student');
-      setMobileNumber('9876543230'); // Ahmad Rayan (Pending)
-      setPassword('password123');
     }
   };
 
@@ -194,13 +178,20 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-400" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50/50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600 text-gray-900 dark:text-white"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50/50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600 text-gray-900 dark:text-white"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -214,42 +205,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Fill Buttons */}
-        <div className="mt-8 pt-4 border-t border-gray-100 dark:border-islamic-border space-y-2">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center flex items-center justify-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-gold-500" />
-            Quick Demo Autofill:
-          </p>
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => setDemoCredentials('admin')}
-              className="text-left px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-islamic-dark hover:bg-gold-50 dark:hover:bg-gold-950/40 text-xs text-tarbiyah-900 dark:text-gold-300 border border-gray-200 dark:border-islamic-border flex items-center justify-between"
-            >
-              <span>🔑 <strong>Admin:</strong> admin / 4321</span>
-              <span className="text-[10px] text-gray-400">Click to fill</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoCredentials('approved_student')}
-              className="text-left px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-islamic-dark hover:bg-gold-50 dark:hover:bg-gold-950/40 text-xs text-tarbiyah-900 dark:text-gold-300 border border-gray-200 dark:border-islamic-border flex items-center justify-between"
-            >
-              <span>🎓 <strong>Approved Student:</strong> 9876543210</span>
-              <span className="text-[10px] text-gray-400">Click to fill</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoCredentials('pending_student')}
-              className="text-left px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-islamic-dark hover:bg-amber-50 dark:hover:bg-amber-950/40 text-xs text-amber-800 dark:text-amber-300 border border-gray-200 dark:border-islamic-border flex items-center justify-between"
-            >
-              <span>⏳ <strong>Pending Student:</strong> 9876543230</span>
-              <span className="text-[10px] text-gray-400">Test Pending Rule</span>
-            </button>
-          </div>
-        </div>
-
         {/* Link to Register */}
-        <div className="mt-6 text-center text-xs text-gray-600 dark:text-gray-400">
+        <div className="mt-8 text-center text-xs text-gray-600 dark:text-gray-400">
           {t.auth.dontHaveAccount}{' '}
           <Link href="/register" className="font-bold text-tarbiyah-800 dark:text-gold-400 hover:underline">
             {t.auth.registerBtn}
