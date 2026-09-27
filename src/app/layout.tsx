@@ -12,8 +12,16 @@ export const metadata: Metadata = {
   description: 'Learn Quran. Build Character. Grow in Faith. Online Madrasa, Tajweed, Hifz, Live Classes, and Student Character Tracking.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/icon-192.png',
+    apple: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Tarbiyah',
+    statusBarStyle: 'black-translucent',
   },
 };
 
