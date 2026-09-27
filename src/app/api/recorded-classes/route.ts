@@ -1,47 +1,89 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function formatYouTubeUrl(url: string): string {
+  if (!url) return '';
+  const clean = url.trim();
+  // Handle youtube.com/watch?v=ID
+  const matchWatch = clean.match(/[?&]v=([^&#]+)/);
+  if (matchWatch && matchWatch[1]) {
+    return `https://www.youtube.com/embed/${matchWatch[1]}`;
+  }
+  // Handle youtu.be/ID
+  const matchShort = clean.match(/youtu\.be\/([^?&#]+)/);
+  if (matchShort && matchShort[1]) {
+    return `https://www.youtube.com/embed/${matchShort[1]}`;
+  }
+  // Handle youtube.com/embed/ID
+  if (clean.includes('/embed/')) {
+    return clean;
+  }
+  return clean;
+}
+
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const subject = searchParams.get('subject');
-  const level = searchParams.get('level');
+  try {
+    const { searchParams } = new URL(req.url);
+    const classNumber = searchParams.get('classNumber');
 
-  let list = db.getRecordedClasses();
+    let list = db.getRecordedClasses();
 
-  if (subject && subject !== 'all') {
-    list = list.filter(v => v.subject === subject);
+    if (classNumber && classNumber !== 'all') {
+      list = list.filter(v => v.classNumber === classNumber);
+    }
+
+    return NextResponse.json({ videos: list });
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to retrieve recorded classes" }, { status: 500 });
   }
-
-  if (level && level !== 'all') {
-    list = list.filter(v => v.level === level);
-  }
-
-  return NextResponse.json({ videos: list });
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, description, subject, level, teacherName, videoUrl, thumbnailUrl, durationSeconds, tags } = body;
+    const { title, description, youtubeUrl, videoUrl, classNumber, teacherName, subject, level } = body;
 
-    if (!title || !subject || !teacherName || !videoUrl) {
-      return NextResponse.json({ error: "Title, subject, teacher name, and video URL are required" }, { status: 400 });
+    const finalVideoUrl = formatYouTubeUrl(youtubeUrl || videoUrl);
+
+    if (!title || !finalVideoUrl) {
+      return NextResponse.json({ error: "Title and YouTube Video URL are required." }, { status: 400 });
     }
 
     const created = db.createRecordedClass({
       title,
-      description: description || "Tarbiyah recorded lecture series.",
-      subject,
-      level: level || 'Beginner',
-      teacherName,
-      videoUrl,
-      thumbnailUrl: thumbnailUrl || "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=600&auto=format&fit=crop&q=80",
-      durationSeconds: durationSeconds ? parseInt(durationSeconds, 10) : 1200,
-      tags: tags || [subject, level]
+      description: description || "ക്ലാസ് വിവരണം നൽകിയിട്ടില്ല.",
+      classNumber: classNumber || "ക്ലാസ് 1",
+      youtubeUrl: youtubeUrl || videoUrl,
+      videoUrl: finalVideoUrl,
+      subject: subject || 'islamic_studies',
+      level: level || 'All Levels',
+      teacherName: teacherName || "ഉസ്താദ്",
+      durationSeconds: 1200,
+      tags: [classNumber || 'General']
     });
 
     return NextResponse.json({ success: true, video: created }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: "Failed to upload/register recorded video" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save recorded class" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
+    }
+
+    const success = db.deleteRecordedClass(id);
+    if (!success) {
+      return NextResponse.json({ error: "Class not found or already deleted" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: "Recorded class deleted successfully" });
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to delete recorded class" }, { status: 500 });
   }
 }

@@ -1,351 +1,584 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
 import { BismillahBanner, RubElHizb } from '@/components/common/IslamicMotif';
-import { LiveClass, Certificate, NotificationItem } from '@/lib/types';
+import { LiveClass, RecordedClass, AttendanceRecord } from '@/lib/types';
 import { 
   User, 
-  BookOpen, 
-  Calendar, 
-  Award, 
   Video, 
-  Bell, 
+  Tv, 
+  Calendar, 
   CheckCircle2, 
+  XCircle, 
   Clock, 
-  ChevronRight, 
-  Download, 
-  ShieldCheck, 
-  Flame,
-  BookmarkCheck,
-  Sparkles,
-  Phone
+  Lock, 
+  Phone, 
+  Edit3, 
+  Save, 
+  ExternalLink,
+  Play,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 export default function StudentDashboardPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
-  const { t } = useLanguage();
+  const { user, loading, logout } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<'classes' | 'recorded' | 'attendance' | 'profile'>('classes');
+
+  // Data states
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [revisionDoneToday, setRevisionDoneToday] = useState(false);
+  const [recordedClasses, setRecordedClasses] = useState<RecordedClass[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [attStats, setAttStats] = useState({ totalRecords: 0, presentRecords: 0, absentRecords: 0, overallPercentage: 0 });
+
+  // Profile Edit state
+  const [editName, setEditName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Active video player
+  const [playingVideo, setPlayingVideo] = useState<RecordedClass | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push('/');
       return;
     }
 
     if (user) {
-      // Fetch user's live classes
+      setEditName(user.name || '');
+
+      // 1. Fetch Google Meet Live Classes
       fetch('/api/live-classes')
         .then(r => r.json())
         .then(d => { if (d.classes) setLiveClasses(d.classes); })
         .catch(() => {});
 
-      // Fetch user's certificates
-      fetch(`/api/certificates?studentId=${user.id}`)
+      // 2. Fetch Recorded YouTube Classes
+      fetch('/api/recorded-classes')
         .then(r => r.json())
-        .then(d => { if (d.certificates) setCertificates(d.certificates); })
+        .then(d => { if (d.videos) setRecordedClasses(d.videos); })
         .catch(() => {});
 
-      // Fetch notifications
-      fetch(`/api/notifications?studentId=${user.id}`)
+      // 3. Fetch exact Student Attendance
+      fetch(`/api/attendance?studentId=${user.id}`)
         .then(r => r.json())
-        .then(d => { if (d.notifications) setNotifications(d.notifications); })
+        .then(d => {
+          if (d.records) setAttendanceRecords(d.records);
+          if (d.stats) setAttStats(d.stats);
+        })
         .catch(() => {});
     }
   }, [user, loading, router]);
 
+  // Handle Profile Update (Name & Password editable, Mobile Number FIXED)
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+    setProfileSuccess(false);
+
+    if (!editName.trim()) {
+      setProfileError("പേര് നിർബന്ധമാണ്.");
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const payload: Record<string, any> = {
+        id: user?.id,
+        fullName: editName.trim()
+      };
+      if (newPassword.trim()) {
+        payload.password = newPassword.trim();
+      }
+
+      const res = await fetch('/api/students', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setProfileSaving(false);
+
+      if (res.ok && data.success) {
+        setProfileSuccess(true);
+        setNewPassword('');
+        setTimeout(() => setProfileSuccess(false), 4000);
+      } else {
+        setProfileError(data.error || "പ്രൊഫൈൽ മാറ്റാൻ സാധിച്ചില്ല.");
+      }
+    } catch (err: any) {
+      setProfileSaving(false);
+      setProfileError("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
+    }
+  };
+
   if (loading) {
     return (
-      <div className="py-20 text-center">
+      <div className="py-24 text-center">
         <div className="w-10 h-10 border-4 border-tarbiyah-800 border-t-gold-500 rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-sm font-semibold text-gray-500">{t.common.loading}</p>
+        <p className="text-sm font-semibold text-gray-500">ലോഡിംഗ്...</p>
       </div>
     );
   }
 
-  const attendancePercent = user?.attendanceRate ?? 94.5;
-  const currentLevel = user?.currentLevel ?? 'Intermediate Hifz';
-  const currentSurahNum = user?.currentSurah ?? 18;
-  const currentAyahNum = user?.currentAyah ?? 45;
-  const juzCount = user?.hifzJuzCompleted ?? 6;
-
   return (
-    <div className="space-y-8 py-4">
+    <div className="space-y-6 py-2 sm:py-4 max-w-4xl mx-auto">
       
       <BismillahBanner />
 
-      {/* Top Welcome Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-tarbiyah-950 via-tarbiyah-900 to-tarbiyah-800 text-white shadow-xl border border-gold-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gold-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-16 h-16 rounded-2xl bg-tarbiyah-800/80 border-2 border-gold-400 flex items-center justify-center font-bold text-2xl text-gold-300 shadow-md">
+      {/* Top Welcome Card */}
+      <div className="p-5 sm:p-7 rounded-3xl bg-gradient-to-r from-tarbiyah-950 via-tarbiyah-900 to-tarbiyah-800 text-white shadow-xl border border-gold-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-14 h-14 rounded-2xl bg-tarbiyah-800/80 border-2 border-gold-400 flex items-center justify-center font-bold text-2xl text-gold-300 shadow-md shrink-0">
             {user?.name?.charAt(0) || 'S'}
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Assalamu Alaikum, {user?.name || 'Student'}!
-              </h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
-                Active Student
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-emerald-200/80">
-              Curriculum Track: <strong className="text-gold-300 font-bold">{currentLevel}</strong> • ID: {user?.id}
+          <div>
+            <span className="text-[11px] font-semibold text-emerald-300 block uppercase tracking-wider">
+              വിദ്യാർത്ഥി പോർട്ടൽ
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black text-white">
+              {user?.name || 'വിദ്യാർത്ഥി'}
+            </h1>
+            <p className="text-xs text-emerald-100/80 flex items-center gap-1.5 mt-0.5">
+              <Phone className="w-3.5 h-3.5 text-gold-400" />
+              <span>{user?.mobileNumber}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
-          <Link
-            href="/quran-module"
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-tarbiyah-950 font-bold text-xs shadow-md transition-all text-center flex items-center justify-center gap-1.5"
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Open Mushaf Reader</span>
-          </Link>
-        </div>
+        <button
+          onClick={logout}
+          className="text-xs font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all self-end sm:self-center"
+        >
+          ലോഗൗട്ട് (Logout)
+        </button>
       </div>
 
-      {/* 4 Core Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Attendance % */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Attendance %</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </div>
-          <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{attendancePercent}%</p>
-          <div className="w-full bg-gray-100 dark:bg-islamic-dark rounded-full h-1.5 overflow-hidden">
-            <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${attendancePercent}%` }} />
-          </div>
-          <p className="text-[11px] text-gray-400">Exemplary attendance status</p>
-        </div>
+      {/* Navigation Tabs */}
+      <div className="grid grid-cols-4 gap-1.5 p-1.5 bg-gray-100 dark:bg-islamic-card rounded-2xl border border-gray-200 dark:border-islamic-border">
+        <button
+          onClick={() => setActiveTab('classes')}
+          className={`py-2.5 px-1 sm:px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'classes'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span className="truncate">ലൈവ് ക്ലാസ്</span>
+        </button>
 
-        {/* Quran Memorization (Hifz) */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Hifz Progress</span>
-            <Flame className="w-4 h-4 text-gold-500" />
-          </div>
-          <p className="text-3xl font-black text-gold-600 dark:text-gold-400">{juzCount} / 30 <span className="text-xs font-normal text-gray-400">Ajza'</span></p>
-          <div className="w-full bg-gray-100 dark:bg-islamic-dark rounded-full h-1.5 overflow-hidden">
-            <div className="bg-gold-500 h-1.5 rounded-full" style={{ width: `${(juzCount / 30) * 100}%` }} />
-          </div>
-          <p className="text-[11px] text-gray-400">Juz 1 to {juzCount} completed</p>
-        </div>
+        <button
+          onClick={() => setActiveTab('recorded')}
+          className={`py-2.5 px-1 sm:px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'recorded'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Tv className="w-4 h-4" />
+          <span className="truncate">റെക്കോർഡ്</span>
+        </button>
 
-        {/* Today's Surah Bookmark */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Current Bookmark</span>
-            <BookmarkCheck className="w-4 h-4 text-blue-500" />
-          </div>
-          <p className="text-2xl font-black text-tarbiyah-950 dark:text-white">Surah {currentSurahNum}</p>
-          <p className="text-xs text-tarbiyah-800 dark:text-gold-300 font-semibold">Ayah {currentAyahNum}</p>
-          <Link href="/quran-module" className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline block">
-            Continue Reading →
-          </Link>
-        </div>
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`py-2.5 px-1 sm:px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'attendance'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span className="truncate">ഹാജർ</span>
+        </button>
 
-        {/* Certificates */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Certificates</span>
-            <Award className="w-4 h-4 text-purple-500" />
-          </div>
-          <p className="text-3xl font-black text-purple-600 dark:text-purple-400">{certificates.length}</p>
-          <p className="text-[11px] text-gray-400">Official verified credentials</p>
-          <Link href="/certificates" className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline block">
-            View Credentials →
-          </Link>
-        </div>
-
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`py-2.5 px-1 sm:px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'profile'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span className="truncate">പ്രൊഫൈൽ</span>
+        </button>
       </div>
 
-      {/* Main Grid: Quran Tracker & Live Sessions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Quran Progress & Daily Revision Card */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Daily Muraja'ah Task */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-gold-500" />
-                  Today's Muraja'ah (Revision Circle)
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Daily recitation review prescribed by your Ustadh</p>
-              </div>
-
-              <button
-                onClick={() => setRevisionDoneToday(!revisionDoneToday)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  revisionDoneToday
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-gold-50 dark:bg-gold-950 text-gold-800 dark:text-gold-300 border border-gold-300 dark:border-gold-700'
-                }`}
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{revisionDoneToday ? "Completed Alhamdulillah" : t.quran.markRevisionComplete}</span>
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-islamic-dark border border-gray-100 dark:border-islamic-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gold-600 dark:text-gold-400">Target Assigned:</span>
-                <p className="text-sm font-bold text-tarbiyah-950 dark:text-white mt-0.5">Surah Al-Kahf (Ayah 1-50) & Surah Al-Mulk</p>
-                <p className="text-xs text-gray-500">Instructor: Ustadh Abdullah Al-Azhari</p>
-              </div>
-              <Link
-                href="/quran-module"
-                className="px-4 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold hover:bg-tarbiyah-700 transition-colors"
-              >
-                Recite Now
-              </Link>
-            </div>
-
-            {/* Quick Level Roadmap */}
-            <div className="pt-2 border-t border-gray-100 dark:border-islamic-border">
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider block mb-3">
-                Curriculum Milestone Track
-              </span>
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold">
-                  ✓ Qaida Nooraniyah
-                </div>
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold">
-                  ✓ Tilawah Foundations
-                </div>
-                <div className="p-2.5 rounded-xl bg-gold-50 dark:bg-gold-950/80 border border-gold-400 dark:border-gold-700 text-gold-900 dark:text-gold-300 font-bold shadow-xs">
-                  ★ Hifz & Tajweed
-                </div>
-                <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-islamic-dark text-gray-400 font-medium">
-                  Ijazah Sanad
-                </div>
-              </div>
-            </div>
+      {/* 1. TAB: LIVE CLASSES (Google Meet) */}
+      {activeTab === 'classes' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Video className="w-5 h-5 text-emerald-600" />
+              <span>ലൈവ് ക്ലാസുകൾ (Google Meet)</span>
+            </h2>
+            <span className="text-xs text-gray-500">{liveClasses.length} ക്ലാസുകൾ</span>
           </div>
 
-          {/* Upcoming Live Classes */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                <Video className="w-5 h-5 text-gold-500" />
-                Upcoming Live Classrooms
-              </h3>
-              <Link href="/live-classes" className="text-xs font-bold text-tarbiyah-800 dark:text-gold-400 hover:underline">
-                View All Schedule →
-              </Link>
+          {liveClasses.length === 0 ? (
+            <div className="p-8 text-center bg-white dark:bg-islamic-card rounded-2xl border border-dashed border-gray-300 dark:border-islamic-border">
+              <Clock className="w-10 h-10 text-gray-400 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                നിലവിൽ ലൈവ് ക്ലാസുകൾ ഷെഡ്യൂൾ ചെയ്തിട്ടില്ല.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                ക്ലാസ് ആരംഭിക്കുമ്പോൾ ഇവിടെ കാണാവുന്നതാണ്.
+              </p>
             </div>
-
-            <div className="space-y-3">
-              {liveClasses.map(cls => (
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {liveClasses.map((cls) => (
                 <div
                   key={cls.id}
-                  className="p-4 rounded-2xl bg-gray-50 dark:bg-islamic-dark border border-gray-100 dark:border-islamic-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm hover:shadow-md transition-shadow space-y-3"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                        cls.provider === 'zoom' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      }`}>
-                        {cls.provider.toUpperCase()}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200">
+                        {cls.level || 'എല്ലാ ക്ലാസുകൾക്കും'}
                       </span>
-                      <span className="text-xs font-semibold text-gray-500">
-                        {cls.durationMinutes} mins
-                      </span>
+                      <h3 className="text-base font-bold text-tarbiyah-950 dark:text-white mt-1.5">
+                        {cls.title}
+                      </h3>
+                      {cls.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">{cls.description}</p>
+                      )}
                     </div>
-                    <h4 className="font-bold text-sm text-tarbiyah-950 dark:text-white">{cls.title}</h4>
-                    <p className="text-xs text-gray-500">Instructor: {cls.teacherName}</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-islamic-dark text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-tarbiyah-700 dark:text-gold-400 shrink-0" />
+                    <span className="font-semibold">
+                      സമയം: {new Date(cls.startTime).toLocaleString('ml-IN', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      })}
+                    </span>
                   </div>
 
                   <a
                     href={cls.meetingLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 font-bold text-xs shadow-md border border-gold-500/30 text-center transition-all"
+                    className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
                   >
-                    Join {cls.provider === 'zoom' ? 'Zoom' : 'Meet'}
+                    <ExternalLink className="w-4 h-4" />
+                    <span>ഗൂഗിൾ മീറ്റിൽ പ്രവേശിക്കുക (Join Meet)</span>
                   </a>
                 </div>
               ))}
             </div>
-          </div>
-
+          )}
         </div>
+      )}
 
-        {/* Sidebar: Student Profile Details & Notifications */}
-        <div className="space-y-6">
-          
-          {/* Profile Card */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <User className="w-4 h-4 text-gold-500" />
-              Student Profile
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-islamic-border">
-                <span className="text-gray-500">Full Name</span>
-                <span className="font-bold text-tarbiyah-950 dark:text-white">{user?.name}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-islamic-border">
-                <span className="text-gray-500">Mobile Number</span>
-                <span className="font-mono font-semibold">{user?.mobileNumber || "9876543210"}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-islamic-border">
-                <span className="text-gray-500">Gender & Age</span>
-                <span className="capitalize">{user?.gender || 'male'} ({user?.age || 12} yrs)</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-islamic-border">
-                <span className="text-gray-500">Parent / Guardian</span>
-                <span className="font-semibold">{user?.parentName || "Muhammad Farooq"}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-islamic-border">
-                <span className="text-gray-500">Parent Contact</span>
-                <span className="font-mono">{user?.parentMobile || "9876543211"}</span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-gray-500">Residential Address</span>
-                <span className="text-right text-gray-700 dark:text-gray-300 max-w-[150px] truncate">{user?.address || "Kozhikode, Kerala"}</span>
-              </div>
-            </div>
+      {/* 2. TAB: RECORDED YOUTUBE CLASSES */}
+      {activeTab === 'recorded' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Tv className="w-5 h-5 text-red-600" />
+              <span>റെക്കോർഡ് ചെയ്ത ക്ലാസുകൾ (YouTube)</span>
+            </h2>
+            <span className="text-xs text-gray-500">{recordedClasses.length} വീഡിയോകൾ</span>
           </div>
 
-          {/* Notifications Card */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Bell className="w-4 h-4 text-gold-500" />
-              Recent Alerts & Notices
-            </h3>
+          {/* Active Video Player Modal/Section if chosen */}
+          {playingVideo && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-black text-white space-y-3 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] text-gold-400 font-bold">{playingVideo.classNumber}</span>
+                  <h3 className="text-base font-bold truncate">{playingVideo.title}</h3>
+                </div>
+                <button
+                  onClick={() => setPlayingVideo(null)}
+                  className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-xs font-bold"
+                >
+                  ക്ലോസ് ചെയ്യുക
+                </button>
+              </div>
 
-            <div className="space-y-2.5">
-              {notifications.map(n => (
-                <div key={n.id} className="p-3 rounded-xl bg-gray-50 dark:bg-islamic-dark text-xs space-y-1">
-                  <p className="font-bold text-tarbiyah-900 dark:text-gold-300">{n.title}</p>
-                  <p className="text-gray-600 dark:text-gray-400 text-[11px] leading-relaxed">{n.message}</p>
-                  <span className="text-[10px] text-gray-400 block">{new Date(n.createdAt).toLocaleDateString()}</span>
+              <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-900 border border-white/10">
+                <iframe
+                  src={playingVideo.videoUrl}
+                  title={playingVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-0"
+                />
+              </div>
+
+              <p className="text-xs text-gray-300">{playingVideo.description}</p>
+            </div>
+          )}
+
+          {recordedClasses.length === 0 ? (
+            <div className="p-8 text-center bg-white dark:bg-islamic-card rounded-2xl border border-dashed border-gray-300 dark:border-islamic-border">
+              <Tv className="w-10 h-10 text-gray-400 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                റെക്കോർഡ് ചെയ്ത ക്ലാസുകൾ ലഭ്യമല്ല.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recordedClasses.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
+                >
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-tarbiyah-50 dark:bg-tarbiyah-950/60 text-tarbiyah-800 dark:text-gold-400 border border-tarbiyah-200">
+                        {rec.classNumber || 'ക്ലാസ്'}
+                      </span>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-tarbiyah-950 dark:text-white line-clamp-2">
+                      {rec.title}
+                    </h4>
+
+                    {rec.description && (
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        {rec.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-islamic-dark border-t border-gray-100 dark:border-islamic-border flex items-center gap-2">
+                    <button
+                      onClick={() => setPlayingVideo(rec)}
+                      className="flex-1 py-2 px-3 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>ഇവിടെ കാണുക</span>
+                    </button>
+
+                    {rec.youtubeUrl && (
+                      <a
+                        href={rec.youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-red-500"
+                        title="YouTube-ൽ തുറക്കുക"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. TAB: ATTENDANCE STATUS */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-tarbiyah-800 dark:text-gold-400" />
+              <span>വിദ്യാർത്ഥിയുടെ ഹാജർ നില (Attendance)</span>
+            </h2>
           </div>
 
-        </div>
+          {/* Stats Summary Grid */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-islamic-card border border-gray-100 dark:border-islamic-border text-center">
+              <span className="text-xs text-gray-500 block">ആകെ ദിവസങ്ങൾ</span>
+              <span className="text-2xl font-black text-tarbiyah-950 dark:text-white mt-1 block">
+                {attStats.totalRecords}
+              </span>
+            </div>
 
-      </div>
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center">
+              <span className="text-xs text-emerald-800 dark:text-emerald-300 font-bold block">ഹാജർ (Present)</span>
+              <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1 block">
+                {attStats.presentRecords}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-center">
+              <span className="text-xs text-red-800 dark:text-red-300 font-bold block">ഗൈർഹാജർ (Absent)</span>
+              <span className="text-2xl font-black text-red-700 dark:text-red-400 mt-1 block">
+                {attStats.absentRecords}
+              </span>
+            </div>
+          </div>
+
+          {/* Attendance History List */}
+          <div className="bg-white dark:bg-islamic-card rounded-2xl p-4 sm:p-5 border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-3">
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">
+              ഹാജർ വിശദാംശങ്ങൾ (Daily Log)
+            </h3>
+
+            {attendanceRecords.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">
+                ഹാജർ വിവരങ്ങൾ രേഖപ്പെടുത്തിയിട്ടില്ല.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {attendanceRecords.map((att) => (
+                  <div
+                    key={att.id}
+                    className="p-3 rounded-xl bg-gray-50 dark:bg-islamic-dark flex items-center justify-between border border-gray-100 dark:border-islamic-border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-white dark:bg-islamic-card border border-gray-200 dark:border-islamic-border">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                          {new Date(att.date).toLocaleDateString('ml-IN', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </p>
+                        {att.remarks && (
+                          <p className="text-[11px] text-gray-500">{att.remarks}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                      att.status === 'present'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : att.status === 'late'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                    }`}>
+                      {att.status === 'present' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {att.status === 'absent' && <XCircle className="w-3.5 h-3.5" />}
+                      {att.status === 'late' && <Clock className="w-3.5 h-3.5" />}
+                      <span>
+                        {att.status === 'present' ? 'ഹാജർ' : att.status === 'late' ? 'വൈകി' : 'ഗൈർഹാജർ'}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. TAB: PROFILE & SETTINGS (Name & Password edit, Mobile Number FIXED) */}
+      {activeTab === 'profile' && (
+        <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 sm:p-8 border border-tarbiyah-100 dark:border-islamic-border shadow-sm max-w-xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-100 dark:border-islamic-border">
+            <div className="w-10 h-10 rounded-xl bg-tarbiyah-900 text-gold-400 flex items-center justify-center">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-tarbiyah-950 dark:text-white">
+                പ്രൊഫൈൽ വിവരങ്ങൾ (Profile Settings)
+              </h2>
+              <p className="text-xs text-gray-500">
+                പേരും പാസ്‌വേഡും ഇവിടെ എഡിറ്റ് ചെയ്യാം
+              </p>
+            </div>
+          </div>
+
+          {profileSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>പ്രൊഫൈൽ വിജയകരമായി അപ്‌ഡേറ്റ് ചെയ്തു!</span>
+            </div>
+          )}
+
+          {profileError && (
+            <div className="p-3.5 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span>{profileError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSaveProfile} className="space-y-4">
+            
+            {/* Student Name (EDITABLE) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                <Edit3 className="w-3.5 h-3.5 text-tarbiyah-700 dark:text-gold-400" />
+                <span>വിദ്യാർത്ഥിയുടെ പേര് (Full Name - മാറ്റാം)</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-tarbiyah-700"
+              />
+            </div>
+
+            {/* Mobile Number (STRICTLY FIXED - CANNOT BE EDITED) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-gray-400" />
+                  <span>മൊബൈൽ നമ്പർ (Mobile Number)</span>
+                </span>
+                <span className="text-[10px] text-red-500 font-semibold flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  <span>മാറ്റാൻ സാധിക്കില്ല (Fixed)</span>
+                </span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  disabled
+                  value={user?.mobileNumber || ''}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-100 dark:bg-gray-800 text-sm font-semibold text-gray-500 cursor-not-allowed select-none"
+                />
+                <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                സുരക്ഷാ കാരണങ്ങളാൽ രജിസ്റ്റർ ചെയ്ത മൊബൈൽ നമ്പർ മാറ്റാൻ അനുവാദമില്ല.
+              </p>
+            </div>
+
+            {/* New Password (EDITABLE) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-tarbiyah-700 dark:text-gold-400" />
+                <span>പുതിയ പാസ്‌വേഡ് (New Password - ആവശ്യമെങ്കിൽ മാത്രം)</span>
+              </label>
+              <input
+                type="password"
+                placeholder="മാറ്റേണ്ടതില്ലെങ്കിൽ ഒഴിവാക്കാം"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-tarbiyah-700"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={profileSaving}
+              className="w-full py-3 rounded-xl font-bold text-xs bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {profileSaving ? (
+                <div className="w-4 h-4 border-2 border-gold-300 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>സേവ് ചെയ്യുക (Save Changes)</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      )}
 
     </div>
   );

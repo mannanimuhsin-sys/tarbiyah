@@ -142,7 +142,7 @@ export default function RecordedClassesPage() {
 
                 {/* Duration Badge */}
                 <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-black/70 text-white text-[11px] font-mono">
-                  {Math.floor(video.durationSeconds / 60)} mins
+                  {Math.floor((video.durationSeconds || 1200) / 60)} mins
                 </div>
 
                 <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-tarbiyah-900/80 backdrop-blur-sm text-gold-300 text-[10px] font-bold uppercase tracking-wider">
@@ -153,9 +153,9 @@ export default function RecordedClassesPage() {
               {/* Video Info */}
               <div className="p-5 space-y-3">
                 <div className="flex items-center gap-2 text-xs text-gold-600 dark:text-gold-400 font-semibold uppercase tracking-wider">
-                  <span>{video.subject.replace('_', ' ')}</span>
+                  <span>{(video.subject || 'islamic_studies').replace('_', ' ')}</span>
                   <span>•</span>
-                  <span>Ustadh {video.teacherName}</span>
+                  <span>{video.classNumber || video.teacherName || 'ക്ലാസ്'}</span>
                 </div>
 
                 <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white leading-snug group-hover:text-gold-600 dark:group-hover:text-gold-400 transition-colors">
@@ -206,9 +206,9 @@ export default function RecordedClassesPage() {
             <div className="p-6 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gold-600 dark:text-gold-400 uppercase tracking-wider">
-                  {activeVideo.subject.replace('_', ' ')} • {activeVideo.level}
+                  {(activeVideo.subject || 'islamic_studies').replace('_', ' ')} • {activeVideo.level || 'All Levels'}
                 </span>
-                <span className="text-xs text-gray-400">Cloudflare R2 Storage Node</span>
+                <span className="text-xs text-gray-400">{activeVideo.classNumber || ''}</span>
               </div>
               <h2 className="text-xl font-bold text-tarbiyah-950 dark:text-white">
                 {activeVideo.title}

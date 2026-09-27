@@ -96,26 +96,28 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map(link => {
-              const Icon = link.icon;
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-tarbiyah-100 dark:bg-tarbiyah-900/50 text-tarbiyah-900 dark:text-gold-400 font-semibold shadow-sm'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card hover:text-tarbiyah-800 dark:hover:text-emerald-300'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-tarbiyah-700 dark:text-gold-400' : 'text-gray-500 dark:text-gray-400'}`} />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
+          {user && (
+            <nav className="hidden lg:flex items-center gap-1">
+              {navLinks.map(link => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isActive
+                        ? 'bg-tarbiyah-100 dark:bg-tarbiyah-900/50 text-tarbiyah-900 dark:text-gold-400 font-semibold shadow-sm'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card hover:text-tarbiyah-800 dark:hover:text-emerald-300'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-tarbiyah-700 dark:text-gold-400' : 'text-gray-500 dark:text-gray-400'}`} />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
 
           {/* Right Controls: Language, Theme, Notifications, User */}
           <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
@@ -156,58 +158,60 @@ export function Navbar() {
             </button>
 
             {/* In-App Notifications Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setNotifOpen(!notifOpen);
-                  if (!notifOpen && unreadCount > 0) markAllRead();
-                }}
-                className="relative p-1.5 sm:p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card transition-colors"
-                aria-label="Notifications"
-              >
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-red-500 text-[9px] sm:text-[10px] font-bold text-white shadow">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {notifOpen && (
-                <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-auto sm:mt-2 w-auto sm:w-96 rounded-2xl bg-white dark:bg-islamic-card shadow-2xl border border-tarbiyah-100 dark:border-islamic-border p-4 z-50 max-w-[calc(100vw-1rem)]">
-                  <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-islamic-border">
-                    <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-gold-500" />
-                      {t.common.notifications}
-                    </h3>
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
-                      {notifications.length} alerts
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setNotifOpen(!notifOpen);
+                    if (!notifOpen && unreadCount > 0) markAllRead();
+                  }}
+                  className="relative p-1.5 sm:p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card transition-colors"
+                  aria-label="Notifications"
+                >
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-red-500 text-[9px] sm:text-[10px] font-bold text-white shadow">
+                      {unreadCount}
                     </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-auto sm:mt-2 w-auto sm:w-96 rounded-2xl bg-white dark:bg-islamic-card shadow-2xl border border-tarbiyah-100 dark:border-islamic-border p-4 z-50 max-w-[calc(100vw-1rem)]">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-islamic-border">
+                      <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-gold-500" />
+                        {t.common.notifications}
+                      </h3>
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                        {notifications.length} alerts
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {notifications.length === 0 ? (
+                        <p className="text-center text-xs text-gray-500 py-6">No notifications yet.</p>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            className="p-2.5 rounded-xl bg-gray-50 dark:bg-islamic-dark/60 border border-gray-100 dark:border-islamic-border hover:border-gold-400/50 transition-colors"
+                          >
+                            <p className="text-xs font-bold text-tarbiyah-900 dark:text-gold-300">{n.title}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{n.message}</p>
+                            <span className="text-[10px] text-gray-400 mt-1 block">
+                              {new Date(n.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-2 space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {notifications.length === 0 ? (
-                      <p className="text-center text-xs text-gray-500 py-6">No notifications yet.</p>
-                    ) : (
-                      notifications.map(n => (
-                        <div
-                          key={n.id}
-                          className="p-2.5 rounded-xl bg-gray-50 dark:bg-islamic-dark/60 border border-gray-100 dark:border-islamic-border hover:border-gold-400/50 transition-colors"
-                        >
-                          <p className="text-xs font-bold text-tarbiyah-900 dark:text-gold-300">{n.title}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{n.message}</p>
-                          <span className="text-[10px] text-gray-400 mt-1 block">
-                            {new Date(n.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* User Session Profile / Auth Actions */}
-            {user ? (
+            {user && (
               <div className="flex items-center gap-1 sm:gap-2">
                 <Link
                   href={user.role === 'super_admin' ? '/admin' : '/dashboard'}
@@ -228,37 +232,24 @@ export function Navbar() {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Link
-                  href="/login"
-                  className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg text-xs font-bold text-tarbiyah-900 dark:text-gold-300 hover:bg-tarbiyah-50 dark:hover:bg-islamic-card transition-colors"
-                >
-                  {t.nav.login}
-                </Link>
-                <Link
-                  href="/register"
-                  className="hidden sm:inline-flex px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-tarbiyah-800 to-tarbiyah-700 text-gold-300 hover:from-tarbiyah-700 hover:to-tarbiyah-600 shadow-md shadow-tarbiyah-900/10 border border-gold-500/30 transition-all whitespace-nowrap"
-                >
-                  {t.nav.register}
-                </Link>
-              </div>
             )}
 
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-1.5 sm:p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
-            </button>
+            {/* Mobile Menu Button (Only when logged in) */}
+            {user && (
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-1.5 sm:p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-islamic-card"
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
+      {/* Mobile Drawer Menu (Only when logged in) */}
+      {user && mobileMenuOpen && (
         <div className="lg:hidden px-4 pt-2 pb-6 space-y-2 bg-white dark:bg-islamic-dark border-b border-tarbiyah-100 dark:border-islamic-border shadow-xl">
           {navLinks.map(link => {
             const Icon = link.icon;

@@ -191,7 +191,7 @@ export const db = {
     data.notifications.unshift({
       id: `notif-${Date.now().toString().slice(-6)}`,
       title: `New Live Class Scheduled: ${newClass.title}`,
-      message: `Ustadh ${newClass.teacherName} will conduct ${newClass.title} via ${newClass.provider.toUpperCase()} at ${new Date(newClass.startTime).toLocaleString()}.`,
+      message: `Ustadh ${newClass.teacherName || 'ഉസ്താദ്'} will conduct ${newClass.title} via ${(newClass.provider || 'google_meet').toUpperCase()} at ${new Date(newClass.startTime).toLocaleString()}.`,
       type: "class_reminder",
       targetRole: "all",
       isRead: false,
@@ -201,8 +201,18 @@ export const db = {
     saveDatabase(data);
     return newClass;
   },
+  deleteLiveClass: (id: string): boolean => {
+    const data = loadDatabase();
+    const prev = data.liveClasses.length;
+    data.liveClasses = data.liveClasses.filter(c => c.id !== id);
+    if (data.liveClasses.length !== prev) {
+      saveDatabase(data);
+      return true;
+    }
+    return false;
+  },
 
-  // Recorded Classes (Cloudflare R2 Integration)
+  // Recorded Classes
   getRecordedClasses: (): RecordedClass[] => {
     return loadDatabase().recordedClasses;
   },
@@ -218,10 +228,30 @@ export const db = {
     saveDatabase(data);
     return newRecord;
   },
+  deleteRecordedClass: (id: string): boolean => {
+    const data = loadDatabase();
+    const prev = data.recordedClasses.length;
+    data.recordedClasses = data.recordedClasses.filter(c => c.id !== id);
+    if (data.recordedClasses.length !== prev) {
+      saveDatabase(data);
+      return true;
+    }
+    return false;
+  },
 
   // Attendance
   getAttendance: (): AttendanceRecord[] => {
     return loadDatabase().attendance;
+  },
+  deleteAttendance: (id: string): boolean => {
+    const data = loadDatabase();
+    const prev = data.attendance.length;
+    data.attendance = data.attendance.filter(a => a.id !== id);
+    if (data.attendance.length !== prev) {
+      saveDatabase(data);
+      return true;
+    }
+    return false;
   },
   markAttendance: (record: Omit<AttendanceRecord, 'id'>): AttendanceRecord => {
     const data = loadDatabase();

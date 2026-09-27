@@ -1,1141 +1,1217 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
-import { Student, Teacher, LiveClass, RecordedClass, AttendanceRecord, MadrasaSettings } from '@/lib/types';
+import { Student, LiveClass, RecordedClass, AttendanceRecord, MadrasaSettings } from '@/lib/types';
 import { 
   Users, 
   CheckCircle, 
   XCircle, 
   Clock, 
   Search, 
-  Download, 
-  Plus, 
   Trash2, 
   Edit, 
   Video, 
   Tv, 
-  Award, 
   Calendar, 
-  BarChart3, 
   ShieldCheck, 
-  FileText, 
-  GraduationCap, 
-  UserCheck, 
-  Sparkles,
-  Phone,
+  Settings, 
+  Save, 
+  Plus, 
+  Phone, 
+  ExternalLink,
+  Lock,
   RefreshCw,
-  Settings,
-  Save,
-  School
+  LogOut,
+  X
 } from 'lucide-react';
 
-export default function AdminDashboardPage() {
+export default function AdminPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { t } = useLanguage();
+  const { user, loading: authLoading, logout } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'teachers' | 'attendance' | 'classes' | 'certificates' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'students' | 'recorded' | 'live' | 'attendance' | 'settings'>('students');
   const [loading, setLoading] = useState(true);
 
   // Data states
   const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [recordedClasses, setRecordedClasses] = useState<RecordedClass[]>([]);
+  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [madrasaSettings, setMadrasaSettings] = useState<MadrasaSettings>({
+  const [settings, setSettings] = useState<MadrasaSettings>({
     madrasaName: '', principalName: '', address: '', phone: '',
     email: '', description: '', admissionYear: new Date().getFullYear().toString(),
     whatsappNumber: '', websiteUrl: ''
   });
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-  // Modals & form states
-  const [showAddTeacher, setShowAddTeacher] = useState(false);
-  const [newTeacher, setNewTeacher] = useState({ fullName: '', email: '', mobileNumber: '', qualification: '', specialization: '' });
+  // Filter & Search states
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentFilter, setStudentFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-  const [showCreateClass, setShowCreateClass] = useState(false);
-  const [newClass, setNewClass] = useState({
+  // New Recorded Class Form state (YouTube)
+  const [newRecorded, setNewRecorded] = useState({
     title: '',
-    subject: 'quran_reading',
-    teacherName: '',
-    provider: 'google_meet',
+    classNumber: 'ക്ലാസ് 1',
+    youtubeUrl: '',
+    description: ''
+  });
+  const [recordedSaving, setRecordedSaving] = useState(false);
+
+  // New Live Class Form state (Google Meet)
+  const [newLive, setNewLive] = useState({
+    title: '',
     meetingLink: '',
     startTime: '',
-    durationMinutes: '45',
-    level: 'All Levels'
+    level: 'എല്ലാ ക്ലാസുകൾക്കും',
+    description: ''
   });
+  const [liveSaving, setLiveSaving] = useState(false);
 
-  const [showIssueCert, setShowIssueCert] = useState(false);
-  const [certData, setCertData] = useState({ studentId: '', courseOrAchievement: '', grade: 'Mumtaz (Excellence)' });
-
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedStudentForAtt, setSelectedStudentForAtt] = useState('');
-  const [attStatus, setAttStatus] = useState<'present' | 'absent' | 'late' | 'excused'>('present');
+  // Attendance Form state
+  const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [attStatus, setAttStatus] = useState<'present' | 'absent' | 'late'>('present');
   const [attRemarks, setAttRemarks] = useState('');
+  const [attSaving, setAttSaving] = useState(false);
 
-  // Fetch all core data
-  const fetchData = async () => {
+  // Edit Student Modal state
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    parentName: '',
+    parentMobile: '',
+    password: '',
+    address: ''
+  });
+  const [studentUpdating, setStudentUpdating] = useState(false);
+
+  // Settings status
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Load all admin data
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [resStd, resTch, resLive, resRec, resAtt] = await Promise.all([
+      const [resStd, resRec, resLive, resAtt, resSet] = await Promise.all([
         fetch('/api/students').then(r => r.json()),
-        fetch('/api/teachers').then(r => r.json()),
-        fetch('/api/live-classes').then(r => r.json()),
         fetch('/api/recorded-classes').then(r => r.json()),
+        fetch('/api/live-classes').then(r => r.json()),
         fetch('/api/attendance').then(r => r.json()),
+        fetch('/api/settings').then(r => r.json()),
       ]);
 
       if (resStd.students) setStudents(resStd.students);
-      if (resTch.teachers) setTeachers(resTch.teachers);
-      if (resLive.classes) setLiveClasses(resLive.classes);
       if (resRec.videos) setRecordedClasses(resRec.videos);
+      if (resLive.classes) setLiveClasses(resLive.classes);
       if (resAtt.records) setAttendanceRecords(resAtt.records);
+      if (resSet.settings) setSettings(resSet.settings);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load admin data:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchSettings = async () => {
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== 'super_admin')) {
+      router.push('/');
+      return;
+    }
+    if (user && user.role === 'super_admin') {
+      loadData();
+    }
+  }, [user, authLoading, router]);
+
+  // Student Actions: Approval / Rejection
+  const handleUpdateStudentStatus = async (id: string, status: 'approved' | 'rejected' | 'pending') => {
     try {
-      const res = await fetch('/api/settings').then(r => r.json());
-      if (res.settings) setMadrasaSettings(res.settings);
-    } catch {}
+      const res = await fetch('/api/students', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, registrationStatus: status })
+      });
+      if (res.ok) {
+        setStudents(prev => prev.map(s => s.id === id ? { ...s, registrationStatus: status } : s));
+      }
+    } catch (err) {
+      alert("സ്റ്റാറ്റസ് മാറ്റാൻ സാധിച്ചില്ല.");
+    }
   };
 
+  // Student Actions: Delete
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!confirm(`വിദ്യാർത്ഥി "${name}"-നെ സ്ഥിരമായി ഡിലീറ്റ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?`)) return;
+    try {
+      const res = await fetch(`/api/students?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setStudents(prev => prev.filter(s => s.id !== id));
+      }
+    } catch (err) {
+      alert("ഡിലീറ്റ് ചെയ്യാൻ സാധിച്ചില്ല.");
+    }
+  };
+
+  // Student Actions: Save Edit
+  const handleSaveStudentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setStudentUpdating(true);
+    try {
+      const payload: Record<string, any> = {
+        id: editingStudent.id,
+        fullName: editForm.fullName.trim(),
+        parentName: editForm.parentName.trim(),
+        parentMobile: editForm.parentMobile.trim(),
+        address: editForm.address.trim()
+      };
+      if (editForm.password.trim()) {
+        payload.password = editForm.password.trim();
+      }
+
+      const res = await fetch('/api/students', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setStudentUpdating(false);
+
+      if (res.ok && data.success) {
+        setStudents(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...payload } : s));
+        setEditingStudent(null);
+      } else {
+        alert(data.error || "അപ്‌ഡേറ്റ് ചെയ്യാൻ സാധിച്ചില്ല.");
+      }
+    } catch (err) {
+      setStudentUpdating(false);
+      alert("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
+    }
+  };
+
+  // Recorded Class: Save New (YouTube)
+  const handleCreateRecorded = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRecorded.title.trim() || !newRecorded.youtubeUrl.trim()) {
+      alert("ഹെഡിങ്ങും യൂട്യൂബ് ലിങ്കും നൽകണം.");
+      return;
+    }
+
+    setRecordedSaving(true);
+    try {
+      const res = await fetch('/api/recorded-classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecorded)
+      });
+      const data = await res.json();
+      setRecordedSaving(false);
+
+      if (res.ok && data.success) {
+        setRecordedClasses(prev => [data.video, ...prev]);
+        setNewRecorded({ title: '', classNumber: 'ക്ലാസ് 1', youtubeUrl: '', description: '' });
+      } else {
+        alert(data.error || "സേവ് ചെയ്യാൻ സാധിച്ചില്ല.");
+      }
+    } catch (err) {
+      setRecordedSaving(false);
+      alert("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
+    }
+  };
+
+  // Recorded Class: Delete
+  const handleDeleteRecorded = async (id: string) => {
+    if (!confirm("ഈ ക്ലാസ് ഡിലീറ്റ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?")) return;
+    try {
+      const res = await fetch(`/api/recorded-classes?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRecordedClasses(prev => prev.filter(c => c.id !== id));
+      }
+    } catch (err) {
+      alert("ഡിലീറ്റ് ചെയ്യാൻ സാധിച്ചില്ല.");
+    }
+  };
+
+  // Live Class: Save New (Google Meet)
+  const handleCreateLive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLive.title.trim() || !newLive.meetingLink.trim() || !newLive.startTime.trim()) {
+      alert("ഹെഡിങ്, ഗൂഗിൾ മീറ്റ് ലിങ്ക്, സമയം എന്നിവ നൽകണം.");
+      return;
+    }
+
+    setLiveSaving(true);
+    try {
+      const res = await fetch('/api/live-classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLive)
+      });
+      const data = await res.json();
+      setLiveSaving(false);
+
+      if (res.ok && data.success) {
+        setLiveClasses(prev => [data.liveClass, ...prev]);
+        setNewLive({ title: '', meetingLink: '', startTime: '', level: 'എല്ലാ ക്ലാസുകൾക്കും', description: '' });
+      } else {
+        alert(data.error || "സേവ് ചെയ്യാൻ സാധിച്ചില്ല.");
+      }
+    } catch (err) {
+      setLiveSaving(false);
+      alert("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
+    }
+  };
+
+  // Live Class: Delete
+  const handleDeleteLive = async (id: string) => {
+    if (!confirm("ഈ ലൈവ് ക്ലാസ് ഷെഡ്യൂൾ ഡിലീറ്റ് ചെയ്യണമെന്ന് ഉറപ്പാണോ?")) return;
+    try {
+      const res = await fetch(`/api/live-classes?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setLiveClasses(prev => prev.filter(c => c.id !== id));
+      }
+    } catch (err) {
+      alert("ഡിലീറ്റ് ചെയ്യാൻ സാധിച്ചില്ല.");
+    }
+  };
+
+  // Attendance: Save Mark
+  const handleMarkAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentId || !attDate) {
+      alert("വിദ്യാർത്ഥിയെയും തിയതിയും തിരഞ്ഞെടുക്കണം.");
+      return;
+    }
+
+    setAttSaving(true);
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: selectedStudentId,
+          date: attDate,
+          status: attStatus,
+          remarks: attRemarks.trim()
+        })
+      });
+      const data = await res.json();
+      setAttSaving(false);
+
+      if (res.ok && data.success) {
+        setAttendanceRecords(prev => [data.record, ...prev.filter(a => !(a.studentId === selectedStudentId && a.date === attDate))]);
+        setAttRemarks('');
+        alert("ഹാജർ വിജയകരമായി രേഖപ്പെടുത്തി!");
+      } else {
+        alert(data.error || "ഹാജർ രേഖപ്പെടുത്താൻ സാധിച്ചില്ല.");
+      }
+    } catch (err) {
+      setAttSaving(false);
+      alert("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
+    }
+  };
+
+  // Attendance: Delete
+  const handleDeleteAttendance = async (id: string) => {
+    if (!confirm("ഈ ഹാജർ റെക്കോർഡ് ഒഴിവാക്കണമെന്ന് ഉറപ്പാണോ?")) return;
+    try {
+      const res = await fetch(`/api/attendance?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setAttendanceRecords(prev => prev.filter(a => a.id !== id));
+      }
+    } catch (err) {
+      alert("ഡിലീറ്റ് ചെയ്യാൻ സാധിച്ചില്ല.");
+    }
+  };
+
+  // Madrasa Settings: Save
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsSaving(true);
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(madrasaSettings)
+        body: JSON.stringify(settings)
       });
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 3000);
-    } catch {}
-    finally { setSettingsSaving(false); }
-  };
+      const data = await res.json();
+      setSettingsSaving(false);
 
-  useEffect(() => {
-    fetchData();
-    fetchSettings();
-  }, []);
-
-  // Filtered students
-  const filteredStudents = students.filter(s => {
-    const matchesStatus = statusFilter === 'all' || s.registrationStatus === statusFilter;
-    const matchesSearch = 
-      s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.mobileNumber.includes(searchQuery) ||
-      s.parentName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
-
-  // Actions
-  const handleApprove = async (id: string) => {
-    await fetch(`/api/students/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'approve' })
-    });
-    fetchData();
-  };
-
-  const handleReject = async (id: string) => {
-    await fetch(`/api/students/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reject' })
-    });
-    fetchData();
-  };
-
-  const handleDeleteStudent = async (id: string) => {
-    if (confirm("Are you sure you want to remove this student record?")) {
-      await fetch(`/api/students/${id}`, { method: 'DELETE' });
-      fetchData();
+      if (res.ok && data.success) {
+        setSettingsSaved(true);
+        setTimeout(() => setSettingsSaved(false), 3000);
+      } else {
+        alert("സെറ്റിംഗ്സ് സേവ് ചെയ്യാൻ സാധിച്ചില്ല.");
+      }
+    } catch (err) {
+      setSettingsSaving(false);
+      alert("കണക്ഷൻ തകരാർ സംഭവിച്ചു.");
     }
   };
 
-  const handleAddTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetch('/api/teachers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTeacher)
-    });
-    setShowAddTeacher(false);
-    setNewTeacher({ fullName: '', email: '', mobileNumber: '', qualification: '', specialization: '' });
-    fetchData();
-  };
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.fullName.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                          s.mobileNumber.includes(studentSearch);
+    const matchesFilter = studentFilter === 'all' || s.registrationStatus === studentFilter;
+    return matchesSearch && matchesFilter;
+  });
 
-  const handleCreateLiveClass = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetch('/api/live-classes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newClass)
-    });
-    setShowCreateClass(false);
-    fetchData();
-  };
-
-  const handleMarkAttendance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudentForAtt) return;
-    await fetch('/api/attendance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentId: selectedStudentForAtt,
-        date: attendanceDate,
-        status: attStatus,
-        remarks: attRemarks,
-        markedBy: 'Super Admin'
-      })
-    });
-    setAttRemarks('');
-    fetchData();
-    alert("Attendance marked successfully!");
-  };
-
-  const handleIssueCertificate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!certData.studentId || !certData.courseOrAchievement) return;
-    await fetch('/api/certificates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(certData)
-    });
-    setShowIssueCert(false);
-    alert("Certificate issued and recorded with QR verification code!");
-  };
-
-  // Export CSV
-  const exportStudentsCSV = () => {
-    const headers = ["ID", "Full Name", "Mobile", "Gender", "Age", "Parent Name", "Parent Mobile", "Status", "Attendance %", "Enrollment Date"];
-    const rows = students.map(s => [
-      s.id,
-      `"${s.fullName}"`,
-      s.mobileNumber,
-      s.gender,
-      s.age,
-      `"${s.parentName}"`,
-      s.parentMobile,
-      s.registrationStatus,
-      s.attendanceRate || 0,
-      s.enrollmentDate
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `tarbiyah_students_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Metrics
-  const totalStudentsCount = students.length;
-  const approvedStudentsCount = students.filter(s => s.registrationStatus === 'approved').length;
-  const pendingStudentsCount = students.filter(s => s.registrationStatus === 'pending').length;
-  const presentCount = attendanceRecords.filter(a => a.status === 'present' || a.status === 'late').length;
-  const avgAttendance = attendanceRecords.length > 0
-    ? Math.round((presentCount / attendanceRecords.length) * 100 * 10) / 10
-    : 95.0;
+  const approvedStudents = students.filter(s => s.registrationStatus === 'approved');
 
   return (
-    <div className="space-y-8 py-4">
+    <div className="space-y-6 py-2 sm:py-4 max-w-5xl mx-auto">
       
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-islamic-border">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-gold-500/10 text-gold-500 border border-gold-500/30">
-              <ShieldCheck className="w-5 h-5" />
+      {/* Top Header Card */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-tarbiyah-950 via-tarbiyah-900 to-tarbiyah-800 text-white shadow-xl border border-gold-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-tarbiyah-800/80 border border-gold-400 flex items-center justify-center text-gold-300 shadow-md">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-gold-300 block uppercase tracking-wider">
+              സൂപ്പർ അഡ്മിൻ കൺട്രോൾ പാനൽ
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-tarbiyah-950 dark:text-white">
-              {t.adminDashboard.title}
+            <h1 className="text-xl sm:text-2xl font-black">
+              {settings.madrasaName || 'മദ്റസ മാനേജ്‌മെന്റ്'}
             </h1>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Logged in as Super Admin. Central hub for student approvals, teachers, live classes & reports.
-          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-center">
           <button
-            onClick={fetchData}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-islamic-card border border-gray-200 dark:border-islamic-border text-xs font-semibold text-gray-700 dark:text-gray-300 hover:border-gold-500 transition-colors"
+            onClick={loadData}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20"
+            title="Refresh"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            onClick={exportStudentsCSV}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold hover:bg-tarbiyah-700 shadow-sm border border-gold-500/30 transition-all"
+            onClick={logout}
+            className="text-xs font-bold px-3 py-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white flex items-center gap-1.5"
           >
-            <Download className="w-4 h-4" />
-            <span>{t.adminDashboard.exportCsv}</span>
+            <LogOut className="w-3.5 h-3.5" />
+            <span>ലോഗൗട്ട്</span>
           </button>
         </div>
       </div>
 
-      {/* Admin Tab Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-100 dark:border-islamic-border">
-        {[
-          { id: 'overview', label: "Overview", icon: BarChart3 },
-          { id: 'students', label: `Students (${pendingStudentsCount} pending)`, icon: Users },
-          { id: 'teachers', label: "Teachers", icon: UserCheck },
-          { id: 'attendance', label: "Attendance System", icon: Calendar },
-          { id: 'classes', label: "Classes & Streaming", icon: Video },
-          { id: 'certificates', label: "Certificates", icon: Award },
-          { id: 'settings', label: "Madrasa Settings", icon: Settings },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                isActive
-                  ? 'bg-tarbiyah-800 text-gold-300 shadow-md border border-gold-500/40'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-islamic-card'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Admin Navigation Tabs */}
+      <div className="grid grid-cols-5 gap-1 p-1 bg-gray-100 dark:bg-islamic-card rounded-2xl border border-gray-200 dark:border-islamic-border text-xs font-bold">
+        <button
+          onClick={() => setActiveTab('students')}
+          className={`py-2.5 px-1 sm:px-2 rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+            activeTab === 'students'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span className="truncate">വിദ്യാർത്ഥികൾ ({students.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('recorded')}
+          className={`py-2.5 px-1 sm:px-2 rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+            activeTab === 'recorded'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Tv className="w-4 h-4" />
+          <span className="truncate">റെക്കോർഡ് ({recordedClasses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('live')}
+          className={`py-2.5 px-1 sm:px-2 rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+            activeTab === 'live'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span className="truncate">ലൈവ് ക്ലാസ് ({liveClasses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`py-2.5 px-1 sm:px-2 rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+            activeTab === 'attendance'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span className="truncate">ഹാജർ</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`py-2.5 px-1 sm:px-2 rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+            activeTab === 'settings'
+              ? 'bg-tarbiyah-800 text-gold-300 shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span className="truncate">മദ്റസ വിവരങ്ങൾ</span>
+        </button>
       </div>
 
-      {/* TAB 1: OVERVIEW METRICS */}
-      {activeTab === 'overview' && (
-        <div className="space-y-8">
-          
-          {/* 7 Core KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm">
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">{t.adminDashboard.totalStudents}</span>
-              <p className="text-3xl font-black text-tarbiyah-950 dark:text-white mt-1">{totalStudentsCount}</p>
-              <span className="text-[11px] text-emerald-600 font-semibold">{approvedStudentsCount} active verified</span>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/20 shadow-sm">
-              <span className="text-xs text-amber-700 dark:text-amber-300 font-bold uppercase">{t.adminDashboard.pendingApprovals}</span>
-              <p className="text-3xl font-black text-amber-600 dark:text-amber-400 mt-1">{pendingStudentsCount}</p>
-              <button 
-                onClick={() => { setActiveTab('students'); setStatusFilter('pending'); }} 
-                className="text-[11px] text-amber-700 font-bold hover:underline"
-              >
-                Review Applications →
-              </button>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm">
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">{t.adminDashboard.attendanceRate}</span>
-              <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{avgAttendance}%</p>
-              <span className="text-[11px] text-gray-400 font-medium">calculated across all sessions</span>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm">
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">{t.adminDashboard.liveClassesCount}</span>
-              <p className="text-3xl font-black text-gold-600 dark:text-gold-400 mt-1">{liveClasses.length}</p>
-              <span className="text-[11px] text-gray-400 font-medium">Zoom & Google Meet hubs</span>
-            </div>
-
-          </div>
-
-          {/* Pending Students Quick Action Section */}
-          {pendingStudentsCount > 0 && (
-            <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300 dark:border-amber-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                  <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white">
-                    Applications Awaiting Approval ({pendingStudentsCount})
-                  </h3>
-                </div>
-                <span className="text-xs text-amber-700 dark:text-amber-400">Students cannot login until approved</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {students.filter(s => s.registrationStatus === 'pending').map(st => (
-                  <div key={st.id} className="p-4 rounded-xl bg-white dark:bg-islamic-card border border-amber-200 dark:border-amber-900 flex items-center justify-between shadow-sm">
-                    <div>
-                      <p className="font-bold text-sm text-tarbiyah-950 dark:text-white">{st.fullName}</p>
-                      <p className="text-xs text-gray-500">Mobile: {st.mobileNumber} | Age: {st.age}</p>
-                      <p className="text-xs text-gray-400">Parent: {st.parentName} ({st.parentMobile})</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleApprove(st.id)}
-                        className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shadow"
-                        title="Approve Student"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleReject(st.id)}
-                        className="p-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors shadow"
-                        title="Reject Student"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Schedule Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border space-y-4">
-              <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                <Video className="w-4 h-4 text-gold-500" />
-                Active Live Classes
-              </h3>
-              <div className="space-y-3">
-                {liveClasses.map(lc => (
-                  <div key={lc.id} className="p-3 rounded-xl bg-gray-50 dark:bg-islamic-dark flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-tarbiyah-900 dark:text-white">{lc.title}</p>
-                      <p className="text-[11px] text-gray-500">Ustadh: {lc.teacherName} • {lc.provider.toUpperCase()}</p>
-                    </div>
-                    <a
-                      href={lc.meetingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1 rounded-lg bg-tarbiyah-800 text-gold-300 text-xs font-bold"
-                    >
-                      Join Class
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border space-y-4">
-              <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-500" />
-                Faculty & Teachers ({teachers.length})
-              </h3>
-              <div className="space-y-3">
-                {teachers.map(tc => (
-                  <div key={tc.id} className="p-3 rounded-xl bg-gray-50 dark:bg-islamic-dark flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-tarbiyah-900 dark:text-white">{tc.fullName}</p>
-                      <p className="text-[11px] text-gold-600 dark:text-gold-400 font-medium">{tc.specialization}</p>
-                    </div>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold">
-                      {tc.assignedClassesCount || 3} Classes
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB 2: STUDENT MANAGEMENT */}
+      {/* 1. TAB: STUDENTS CONTROL (Delete, Edit, Approval) */}
       {activeTab === 'students' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           
-          {/* Controls: Search, Filter, Export */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-islamic-card p-4 rounded-2xl border border-tarbiyah-100 dark:border-islamic-border">
-            
-            {/* Search Input */}
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-islamic-card p-3 rounded-2xl border border-gray-100 dark:border-islamic-border">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder={t.adminDashboard.searchPlaceholder}
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-gray-50 dark:bg-islamic-dark border border-gray-200 dark:border-islamic-border text-xs focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+                placeholder="പേര് അല്ലെങ്കിൽ മൊബൈൽ നമ്പർ..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark focus:outline-none"
               />
             </div>
 
-            {/* Status Pills */}
             <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
-              {(['all', 'approved', 'pending', 'rejected'] as const).map(st => (
+              {(['all', 'pending', 'approved', 'rejected'] as const).map(status => (
                 <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors ${
-                    statusFilter === st
+                  key={status}
+                  onClick={() => setStudentFilter(status)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    studentFilter === status
                       ? 'bg-tarbiyah-800 text-gold-300'
-                      : 'bg-gray-100 dark:bg-islamic-dark text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                      : 'bg-gray-100 dark:bg-islamic-dark text-gray-600 dark:text-gray-400'
                   }`}
                 >
-                  {st}
+                  {status === 'all' && `എല്ലാം (${students.length})`}
+                  {status === 'pending' && `പെൻഡിംഗ് (${students.filter(s => s.registrationStatus === 'pending').length})`}
+                  {status === 'approved' && `അംഗീകരിച്ചവർ (${students.filter(s => s.registrationStatus === 'approved').length})`}
+                  {status === 'rejected' && `നിരസിച്ചവർ (${students.filter(s => s.registrationStatus === 'rejected').length})`}
                 </button>
               ))}
             </div>
-
-            <button
-              onClick={exportStudentsCSV}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-islamic-dark hover:bg-gray-200 text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
-            </button>
           </div>
 
-          {/* Students Table */}
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-islamic-border bg-white dark:bg-islamic-card shadow-sm">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 dark:bg-islamic-dark text-gray-600 dark:text-gray-400 uppercase font-bold border-b border-gray-200 dark:border-islamic-border">
-                <tr>
-                  <th className="p-4">Student</th>
-                  <th className="p-4">Mobile</th>
-                  <th className="p-4">Parent Details</th>
-                  <th className="p-4">Curriculum Level</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Attendance</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-islamic-border">
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-400">
-                      No students found matching current filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudents.map(student => (
-                    <tr key={student.id} className="hover:bg-gray-50/50 dark:hover:bg-islamic-dark/40 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-tarbiyah-950 dark:text-white">{student.fullName}</div>
-                        <div className="text-[11px] text-gray-500">Age: {student.age} • {student.gender}</div>
-                      </td>
-                      <td className="p-4 font-mono text-gray-700 dark:text-gray-300">{student.mobileNumber}</td>
-                      <td className="p-4">
-                        <div>{student.parentName}</div>
-                        <div className="text-[11px] text-gray-500 font-mono">{student.parentMobile}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="font-semibold text-tarbiyah-800 dark:text-gold-400">{student.currentLevel}</span>
-                        <div className="text-[10px] text-gray-400">Hifz: {student.hifzJuzCompleted} Juz</div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
-                          student.registrationStatus === 'approved'
-                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
-                            : student.registrationStatus === 'pending'
-                            ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
-                            : 'bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300'
-                        }`}>
-                          {student.registrationStatus}
-                        </span>
-                      </td>
-                      <td className="p-4 font-bold text-gray-700 dark:text-gray-300">
-                        {student.attendanceRate ? `${student.attendanceRate}%` : 'N/A'}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {student.registrationStatus === 'pending' && (
-                            <button
-                              onClick={() => handleApprove(student.id)}
-                              className="px-2.5 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-500"
-                              title="Approve"
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {student.registrationStatus === 'pending' && (
-                            <button
-                              onClick={() => handleReject(student.id)}
-                              className="px-2.5 py-1 rounded-md bg-red-600 text-white text-[11px] font-bold hover:bg-red-500"
-                              title="Reject"
-                            >
-                              Reject
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteStudent(student.id)}
-                            className="p-1.5 rounded-md text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Students List Table / Cards */}
+          {filteredStudents.length === 0 ? (
+            <div className="p-8 text-center bg-white dark:bg-islamic-card rounded-2xl border border-dashed border-gray-200 dark:border-islamic-border text-gray-500 text-xs font-semibold">
+              വിദ്യാർത്ഥികൾ ആരുമില്ല.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredStudents.map((std) => (
+                <div
+                  key={std.id}
+                  className="p-4 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-tarbiyah-950 dark:text-white">
+                        {std.fullName}
+                      </h4>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        std.registrationStatus === 'approved'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : std.registrationStatus === 'pending'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                      }`}>
+                        {std.registrationStatus === 'approved' ? 'Approved' : std.registrationStatus === 'pending' ? 'Pending Approval' : 'Rejected'}
+                      </span>
+                    </div>
 
-        </div>
-      )}
-
-      {/* TAB 3: TEACHER MANAGEMENT */}
-      {activeTab === 'teachers' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white">Faculty & Ustadhs</h3>
-            <button
-              onClick={() => setShowAddTeacher(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold hover:bg-tarbiyah-700 shadow border border-gold-500/30"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add New Teacher</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {teachers.map(tch => (
-              <div key={tch.id} className="p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-tarbiyah-900 text-gold-400 flex items-center justify-center font-bold text-lg">
-                    {tch.fullName.charAt(0)}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-gray-400" />
+                        <strong className="text-gray-800 dark:text-gray-200">{std.mobileNumber}</strong>
+                      </span>
+                      {std.parentName && <span>രക്ഷിതാവ്: {std.parentName}</span>}
+                      {std.parentMobile && <span>രക്ഷിതാവിന്റെ ഫോൺ: {std.parentMobile}</span>}
+                      {std.address && <span className="truncate max-w-xs">{std.address}</span>}
+                    </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                    Active
-                  </span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-tarbiyah-950 dark:text-white">{tch.fullName}</h4>
-                  <p className="text-xs text-gold-600 dark:text-gold-400 font-semibold">{tch.specialization}</p>
-                  <p className="text-xs text-gray-500 mt-1">{tch.qualification}</p>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed italic">
-                  "{tch.bio}"
-                </p>
-                <div className="pt-3 border-t border-gray-100 dark:border-islamic-border flex items-center justify-between text-xs text-gray-500">
-                  <span>Mobile: {tch.mobileNumber}</span>
-                  <span className="font-bold text-tarbiyah-800 dark:text-gold-300">{tch.assignedClassesCount || 3} Classes</span>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Add Teacher Modal */}
-          {showAddTeacher && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 max-w-md w-full border border-tarbiyah-100 dark:border-islamic-border shadow-2xl space-y-4">
-                <h3 className="font-bold text-lg text-tarbiyah-950 dark:text-white">Add Certified Teacher</h3>
-                <form onSubmit={handleAddTeacher} className="space-y-3">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Full Name (e.g. Ustadh Ahmad)"
-                    value={newTeacher.fullName}
-                    onChange={e => setNewTeacher({ ...newTeacher, fullName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Mobile Number"
-                    value={newTeacher.mobileNumber}
-                    onChange={e => setNewTeacher({ ...newTeacher, mobileNumber: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Qualification (e.g. Al-Azhar M.A, Hafiz)"
-                    value={newTeacher.qualification}
-                    onChange={e => setNewTeacher({ ...newTeacher, qualification: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Specialization (e.g. Tajweed, Hifz Intensive)"
-                    value={newTeacher.specialization}
-                    onChange={e => setNewTeacher({ ...newTeacher, specialization: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                  <div className="flex gap-2 pt-2">
+                  {/* Actions: Approve / Reject / Edit / Delete */}
+                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                    {std.registrationStatus !== 'approved' && (
+                      <button
+                        onClick={() => handleUpdateStudentStatus(std.id, 'approved')}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm"
+                        title="Approve Student"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>അംഗീകരിക്കുക</span>
+                      </button>
+                    )}
+
+                    {std.registrationStatus !== 'rejected' && (
+                      <button
+                        onClick={() => handleUpdateStudentStatus(std.id, 'rejected')}
+                        className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1 shadow-sm"
+                        title="Reject Student"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>നിരസിക്കുക</span>
+                      </button>
+                    )}
+
                     <button
-                      type="button"
-                      onClick={() => setShowAddTeacher(false)}
-                      className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-islamic-dark text-xs font-bold"
+                      onClick={() => {
+                        setEditingStudent(std);
+                        setEditForm({
+                          fullName: std.fullName || '',
+                          parentName: std.parentName || '',
+                          parentMobile: std.parentMobile || '',
+                          password: '',
+                          address: std.address || ''
+                        });
+                      }}
+                      className="p-1.5 rounded-xl bg-gray-100 dark:bg-islamic-dark text-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                      title="Edit Student Details"
                     >
-                      Cancel
+                      <Edit className="w-4 h-4" />
                     </button>
+
                     <button
-                      type="submit"
-                      className="flex-1 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold"
+                      onClick={() => handleDeleteStudent(std.id, std.fullName)}
+                      className="p-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40"
+                      title="Delete Student"
                     >
-                      Save Teacher
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </form>
-              </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 4: ATTENDANCE SYSTEM */}
-      {activeTab === 'attendance' && (
+      {/* 2. TAB: RECORDED CLASSES (YouTube Links & Class Number) */}
+      {activeTab === 'recorded' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* Mark Attendance Form */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-              <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-500" />
-                Record Daily Attendance
-              </h3>
-              <form onSubmit={handleMarkAttendance} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={attendanceDate}
-                    onChange={e => setAttendanceDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                </div>
+          
+          {/* Create Recorded Class Form */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Tv className="w-4 h-4 text-red-600" />
+              <span>പുതിയ റെക്കോർഡ് ക്ലാസ് ചേർക്കുക (YouTube)</span>
+            </h3>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Select Student</label>
-                  <select
-                    required
-                    value={selectedStudentForAtt}
-                    onChange={e => setSelectedStudentForAtt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  >
-                    <option value="">-- Choose Approved Student --</option>
-                    {students.filter(s => s.registrationStatus === 'approved').map(s => (
-                      <option key={s.id} value={s.id}>{s.fullName} ({s.mobileNumber})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Status</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['present', 'late', 'absent', 'excused'] as const).map(st => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setAttStatus(st)}
-                        className={`py-1.5 rounded-lg text-xs font-bold uppercase transition-colors ${
-                          attStatus === st
-                            ? 'bg-tarbiyah-800 text-gold-300'
-                            : 'bg-gray-100 dark:bg-islamic-dark text-gray-600 dark:text-gray-400'
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Teacher Remarks</label>
+            <form onSubmit={handleCreateRecorded} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ഹെഡിങ് / വിഷയത്തിന്റെ പേര്
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Excellent Muraja'ah recitation"
-                    value={attRemarks}
-                    onChange={e => setAttRemarks(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
+                    required
+                    placeholder="ഉദാ: തജ്‌വീദ് അടിസ്ഥാന പാഠങ്ങൾ"
+                    value={newRecorded.title}
+                    onChange={(e) => setNewRecorded({ ...newRecorded, title: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow"
-                >
-                  Save Attendance Record
-                </button>
-              </form>
-            </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ക്ലാസ് എത്രാമത്തേതാണ്?
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ഉദാ: ക്ലാസ് 1, ഭാഗം 2"
+                    value={newRecorded.classNumber}
+                    onChange={(e) => setNewRecorded({ ...newRecorded, classNumber: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              </div>
 
-            {/* Attendance Logs */}
-            <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
-              <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white flex items-center justify-between">
-                <span>Recent Attendance Logs</span>
-                <span className="text-xs text-emerald-600 font-semibold">Average: {avgAttendance}%</span>
-              </h3>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  യൂട്യൂബ് ലിങ്ക് (YouTube URL)
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://www.youtube.com/watch?v=... അല്ലെങ്കിൽ https://youtu.be/..."
+                  value={newRecorded.youtubeUrl}
+                  onChange={(e) => setNewRecorded({ ...newRecorded, youtubeUrl: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none font-mono"
+                />
+              </div>
 
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {attendanceRecords.map(rec => (
-                  <div key={rec.id} className="p-3 rounded-xl bg-gray-50 dark:bg-islamic-dark flex items-center justify-between text-xs">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  ഡിസ്ക്രിപ്ഷൻ / കുറിപ്പ്
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="ക്ലാസിനെക്കുറിച്ചുള്ള വിവരണം..."
+                  value={newRecorded.description}
+                  onChange={(e) => setNewRecorded({ ...newRecorded, description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-medium focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={recordedSaving}
+                className="px-5 py-2.5 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-md flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {recordedSaving ? 'സേവ് ചെയ്യുന്നു...' : 'സേവ് ചെയ്യുക (Save Class)'}
+              </button>
+            </form>
+          </div>
+
+          {/* List of Saved YouTube Classes */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              ചേർത്ത റെക്കോർഡ് ക്ലാസുകൾ ({recordedClasses.length})
+            </h4>
+
+            {recordedClasses.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">ക്ലാസുകളൊന്നും ചേർത്തിട്ടില്ല.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {recordedClasses.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className="p-4 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex flex-col justify-between gap-3"
+                  >
                     <div>
-                      <span className="font-bold text-tarbiyah-950 dark:text-white">{rec.studentName}</span>
-                      <p className="text-[11px] text-gray-500">{rec.date} • Marked by {rec.markedBy || 'Ustadh'}</p>
-                      {rec.remarks && <p className="text-[11px] text-emerald-700 dark:text-emerald-300 italic">{rec.remarks}</p>}
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-tarbiyah-50 text-tarbiyah-800 dark:bg-tarbiyah-950 dark:text-gold-400">
+                        {rec.classNumber}
+                      </span>
+                      <h5 className="text-sm font-bold text-gray-900 dark:text-white mt-1">
+                        {rec.title}
+                      </h5>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                        {rec.description}
+                      </p>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full uppercase text-[10px] font-bold ${
-                      rec.status === 'present'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        : rec.status === 'late'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {rec.status}
-                    </span>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-islamic-border">
+                      <a
+                        href={rec.youtubeUrl || rec.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
+                      >
+                        <span>YouTube തുറക്കുക</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+
+                      <button
+                        onClick={() => handleDeleteRecorded(rec.id)}
+                        className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-
+            )}
           </div>
+
         </div>
       )}
 
-      {/* TAB 5: CLASSES & STREAMING */}
-      {activeTab === 'classes' && (
+      {/* 3. TAB: LIVE CLASSES (Direct Google Meet Links) */}
+      {activeTab === 'live' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white">Live Classes & Recorded Vault</h3>
-            <button
-              onClick={() => setShowCreateClass(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold hover:bg-tarbiyah-700 shadow"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Schedule Live Class</span>
-            </button>
-          </div>
+          
+          {/* Create Google Meet Class Form */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Video className="w-4 h-4 text-emerald-600" />
+              <span>പുതിയ ലൈവ് ക്ലാസ് ഷെഡ്യൂൾ ചെയ്യുക (Google Meet)</span>
+            </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {liveClasses.map(cls => (
-              <div key={cls.id} className="p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    cls.provider === 'zoom' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                  }`}>
-                    {cls.provider.toUpperCase()}
-                  </span>
-                  <span className="text-[11px] text-gray-400">{cls.durationMinutes} mins</span>
-                </div>
-                <h4 className="font-bold text-sm text-tarbiyah-950 dark:text-white">{cls.title}</h4>
-                <p className="text-xs text-gray-500">Instructor: {cls.teacherName}</p>
-                <div className="pt-2 border-t border-gray-100 dark:border-islamic-border flex items-center justify-between">
-                  <span className="text-[11px] text-gray-400">{new Date(cls.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  <a
-                    href={cls.meetingLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1 rounded-lg bg-tarbiyah-800 text-gold-300 text-xs font-bold"
-                  >
-                    Open Link
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Schedule Live Class Modal */}
-          {showCreateClass && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 max-w-md w-full border border-tarbiyah-100 dark:border-islamic-border shadow-2xl space-y-4">
-                <h3 className="font-bold text-lg text-tarbiyah-950 dark:text-white">Schedule Live Session</h3>
-                <form onSubmit={handleCreateLiveClass} className="space-y-3">
+            <form onSubmit={handleCreateLive} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ക്ലാസ് ഹെഡിങ്
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="Class Title (e.g. Tajweed Noon Sakinah)"
-                    value={newClass.title}
-                    onChange={e => setNewClass({ ...newClass, title: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
+                    placeholder="ഉദാ: ഖുർആൻ ഹിഫ്സ് ലൈവ് ക്ലാസ്"
+                    value={newLive.title}
+                    onChange={(e) => setNewLive({ ...newLive, title: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
                   />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Instructor Name"
-                    value={newClass.teacherName}
-                    onChange={e => setNewClass({ ...newClass, teacherName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
-                  <select
-                    value={newClass.provider}
-                    onChange={e => setNewClass({ ...newClass, provider: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  >
-                    <option value="google_meet">Google Meet</option>
-                    <option value="zoom">Zoom</option>
-                  </select>
-                  <input
-                    type="url"
-                    required
-                    placeholder="Meeting URL (e.g. https://meet.google.com/...)"
-                    value={newClass.meetingLink}
-                    onChange={e => setNewClass({ ...newClass, meetingLink: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    തിയതിയും സമയവും (Date & Time)
+                  </label>
                   <input
                     type="datetime-local"
                     required
-                    value={newClass.startTime}
-                    onChange={e => setNewClass({ ...newClass, startTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
+                    value={newLive.startTime}
+                    onChange={(e) => setNewLive({ ...newLive, startTime: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
                   />
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateClass(false)}
-                      className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-islamic-dark text-xs font-bold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold"
-                    >
-                      Schedule Class
-                    </button>
-                  </div>
-                </form>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 6: CERTIFICATE ISSUANCE */}
-      {activeTab === 'certificates' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white">Auto-Generate Official Certificates</h3>
-            <button
-              onClick={() => setShowIssueCert(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold hover:bg-tarbiyah-700 shadow"
-            >
-              <Award className="w-4 h-4" />
-              <span>Issue New Certificate</span>
-            </button>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border space-y-4">
-            <p className="text-xs text-gray-500">
-              Certificates issued from Tarbiyah automatically receive a cryptographically verified serial code and an embedded QR code link.
-            </p>
-            <div className="flex gap-3">
-              <Link
-                href="/certificates"
-                className="px-4 py-2 rounded-xl bg-gold-50 dark:bg-gold-950/60 text-gold-800 dark:text-gold-300 border border-gold-300 dark:border-gold-700 text-xs font-bold hover:underline"
-              >
-                View & Print Public Certificate Gallery →
-              </Link>
-            </div>
-          </div>
-
-          {/* Issue Cert Modal */}
-          {showIssueCert && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 max-w-md w-full border border-tarbiyah-100 dark:border-islamic-border shadow-2xl space-y-4">
-                <h3 className="font-bold text-lg text-tarbiyah-950 dark:text-white">Issue Authentic Certificate</h3>
-                <form onSubmit={handleIssueCertificate} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Student</label>
-                    <select
-                      required
-                      value={certData.studentId}
-                      onChange={e => setCertData({ ...certData, studentId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                    >
-                      <option value="">-- Choose Student --</option>
-                      {students.filter(s => s.registrationStatus === 'approved').map(s => (
-                        <option key={s.id} value={s.id}>{s.fullName} ({s.mobileNumber})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Achievement / Course</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Completion of 5 Ajza' Hifz with Distinction"
-                      value={certData.courseOrAchievement}
-                      onChange={e => setCertData({ ...certData, courseOrAchievement: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                    >
-                    </input>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Honor Grade</label>
-                    <input
-                      type="text"
-                      value={certData.grade}
-                      onChange={e => setCertData({ ...certData, grade: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs"
-                    />
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowIssueCert(false)}
-                      className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-islamic-dark text-xs font-bold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2 rounded-xl bg-tarbiyah-800 text-gold-300 text-xs font-bold"
-                    >
-                      Generate Certificate
-                    </button>
-                  </div>
-                </form>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  ഗൂഗിൾ മീറ്റ് ലിങ്ക് (Google Meet Link)
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://meet.google.com/xyz-abcd-efg"
+                  value={newLive.meetingLink}
+                  onChange={(e) => setNewLive({ ...newLive, meetingLink: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none font-mono"
+                />
               </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 7: MADRASA SETTINGS */}
-      {activeTab === 'settings' && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-100 dark:border-islamic-border">
-            <span className="p-2 rounded-xl bg-tarbiyah-900/10 text-tarbiyah-800 dark:text-gold-400 border border-tarbiyah-200 dark:border-gold-500/30">
-              <School className="w-5 h-5" />
-            </span>
-            <div>
-              <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white">Madrasa Settings</h3>
-              <p className="text-xs text-gray-500">Enter your madrasa's real information. This will appear throughout the app.</p>
-            </div>
-          </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  വിവരണം / നിർദ്ദേശം
+                </label>
+                <input
+                  type="text"
+                  placeholder="ഉദാ: കൃത്യം 8:00 ന് മുമ്പായി ലിങ്കിൽ ജോയിൻ ചെയ്യുക"
+                  value={newLive.description}
+                  onChange={(e) => setNewLive({ ...newLive, description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-medium focus:outline-none"
+                />
+              </div>
 
-          {settingsSaved && (
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-sm font-semibold flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              Settings saved successfully!
-            </div>
-          )}
-
-          <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Madrasa Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Noorul Hudha Arabic College"
-                value={madrasaSettings.madrasaName}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, madrasaName: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Principal / Headmaster Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Ustadh Abdul Rahman"
-                value={madrasaSettings.principalName}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, principalName: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Phone Number</label>
-              <input
-                type="tel"
-                placeholder="e.g. 9876543210"
-                value={madrasaSettings.phone}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, phone: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">WhatsApp Number</label>
-              <input
-                type="tel"
-                placeholder="e.g. +919876543210"
-                value={madrasaSettings.whatsappNumber}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, whatsappNumber: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Email Address</label>
-              <input
-                type="email"
-                placeholder="e.g. info@yourmadrasa.com"
-                value={madrasaSettings.email}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, email: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Admission Year</label>
-              <input
-                type="text"
-                placeholder="e.g. 2026"
-                value={madrasaSettings.admissionYear}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, admissionYear: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Address</label>
-              <input
-                type="text"
-                placeholder="e.g. Kottakkal Road, Malappuram, Kerala - 676505"
-                value={madrasaSettings.address}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, address: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Website URL</label>
-              <input
-                type="url"
-                placeholder="e.g. https://yourmadrasa.com"
-                value={madrasaSettings.websiteUrl}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, websiteUrl: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
-              />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Madrasa Description</label>
-              <textarea
-                rows={3}
-                placeholder="Brief description about your madrasa shown on the homepage..."
-                value={madrasaSettings.description}
-                onChange={e => setMadrasaSettings({ ...madrasaSettings, description: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600 resize-none"
-              />
-            </div>
-
-            <div className="md:col-span-2">
               <button
                 type="submit"
-                disabled={settingsSaving}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 font-bold text-sm shadow border border-gold-500/30 transition-all disabled:opacity-60"
+                disabled={liveSaving}
+                className="px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center gap-1.5 disabled:opacity-60"
               >
-                <Save className="w-4 h-4" />
-                {settingsSaving ? 'Saving...' : 'Save Madrasa Settings'}
+                {liveSaving ? 'സേവ് ചെയ്യുന്നു...' : 'ലൈവ് ക്ലാസ് സേവ് ചെയ്യുക (Schedule Meet)'}
               </button>
+            </form>
+          </div>
+
+          {/* List of Scheduled Google Meet Sessions */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              ഷെഡ്യൂൾ ചെയ്ത ലൈവ് ക്ലാസുകൾ ({liveClasses.length})
+            </h4>
+
+            {liveClasses.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">ലൈവ് ക്ലാസുകൾ ഷെഡ്യൂൾ ചെയ്തിട്ടില്ല.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {liveClasses.map((cls) => (
+                  <div
+                    key={cls.id}
+                    className="p-4 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex flex-col justify-between gap-3"
+                  >
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Google Meet
+                      </span>
+                      <h5 className="text-sm font-bold text-gray-900 dark:text-white mt-1">
+                        {cls.title}
+                      </h5>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{new Date(cls.startTime).toLocaleString('ml-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-islamic-border">
+                      <a
+                        href={cls.meetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                      >
+                        <span>ലിങ്ക് പരിശോധിക്കുക</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+
+                      <button
+                        onClick={() => handleDeleteLive(cls.id)}
+                        className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* 4. TAB: ATTENDANCE CONTROL */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-6">
+          
+          {/* Mark Attendance Card */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-tarbiyah-950 dark:text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-tarbiyah-800 dark:text-gold-400" />
+              <span>വിദ്യാർത്ഥിയുടെ ഹാജർ രേഖപ്പെടുത്തുക</span>
+            </h3>
+
+            <form onSubmit={handleMarkAttendance} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    തിയതി
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={attDate}
+                    onChange={(e) => setAttDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    വിദ്യാർത്ഥി
+                  </label>
+                  <select
+                    required
+                    value={selectedStudentId}
+                    onChange={(e) => setSelectedStudentId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  >
+                    <option value="">വിദ്യാർത്ഥിയെ തിരഞ്ഞെടുക്കുക</option>
+                    {approvedStudents.map(std => (
+                      <option key={std.id} value={std.id}>
+                        {std.fullName} ({std.mobileNumber})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ഹാജർ നില (Status)
+                  </label>
+                  <select
+                    value={attStatus}
+                    onChange={(e) => setAttStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  >
+                    <option value="present">ഹാജർ (Present)</option>
+                    <option value="absent">ഗൈർഹാജർ (Absent)</option>
+                    <option value="late">വൈകി (Late)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  കുറിപ്പ് (Remarks - ഓപ്ഷണൽ)
+                </label>
+                <input
+                  type="text"
+                  placeholder="ഉദാ: കാരണം ബോധിപ്പിച്ചു"
+                  value={attRemarks}
+                  onChange={(e) => setAttRemarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-medium focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={attSaving}
+                className="px-5 py-2.5 rounded-xl font-bold text-xs bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 shadow-md flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {attSaving ? 'രേഖപ്പെടുത്തുന്നു...' : 'ഹാജർ സേവ് ചെയ്യുക (Save Attendance)'}
+              </button>
+            </form>
+          </div>
+
+          {/* Attendance Log Table */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              ഹാജർ രേഖകൾ ({attendanceRecords.length})
+            </h4>
+
+            {attendanceRecords.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">ഹാജർ വിവരങ്ങൾ രേഖപ്പെടുത്തിയിട്ടില്ല.</p>
+            ) : (
+              <div className="bg-white dark:bg-islamic-card rounded-2xl border border-tarbiyah-100 dark:border-islamic-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-gray-50 dark:bg-islamic-dark text-gray-500 border-b border-gray-100 dark:border-islamic-border">
+                      <tr>
+                        <th className="p-3">തിയതി</th>
+                        <th className="p-3">വിദ്യാർത്ഥി</th>
+                        <th className="p-3">നില</th>
+                        <th className="p-3">കുറിപ്പ്</th>
+                        <th className="p-3 text-right">ആക്ഷൻ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-islamic-border">
+                      {attendanceRecords.slice(0, 50).map(att => (
+                        <tr key={att.id} className="hover:bg-gray-50/50 dark:hover:bg-islamic-dark/40">
+                          <td className="p-3 font-semibold">{att.date}</td>
+                          <td className="p-3 font-bold">{att.studentName}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                              att.status === 'present'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : att.status === 'late'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {att.status === 'present' ? 'ഹാജർ' : att.status === 'late' ? 'വൈകി' : 'ഗൈർഹാജർ'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-500">{att.remarks || '—'}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => handleDeleteAttendance(att.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* 5. TAB: MADRASA SETTINGS */}
+      {activeTab === 'settings' && (
+        <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 sm:p-8 border border-tarbiyah-100 dark:border-islamic-border shadow-sm space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-islamic-border">
+            <div>
+              <h3 className="text-base font-bold text-tarbiyah-950 dark:text-white">
+                മദ്റസ വിവരങ്ങൾ (Madrasa Settings)
+              </h3>
+              <p className="text-xs text-gray-500">
+                ഈ വിവരങ്ങൾ ആപ്പിലും ലോഗിൻ പേജിലും പ്രദർശിപ്പിക്കും
+              </p>
+            </div>
+            {settingsSaved && (
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                സേവ് ചെയ്തു! ✓
+              </span>
+            )}
+          </div>
+
+          <form onSubmit={handleSaveSettings} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  മദ്റസയുടെ പേര് (Madrasa Name)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={settings.madrasaName}
+                  onChange={(e) => setSettings({ ...settings, madrasaName: e.target.value })}
+                  placeholder="നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  പ്രിൻസിപ്പൽ / ഉസ്താദിന്റെ പേര്
+                </label>
+                <input
+                  type="text"
+                  value={settings.principalName}
+                  onChange={(e) => setSettings({ ...settings, principalName: e.target.value })}
+                  placeholder="ഉസ്താദ് അബ്ദുൽ റഹ്മാൻ"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  WhatsApp നമ്പർ (വിദ്യാർത്ഥികൾ ബന്ധപ്പെടാൻ)
+                </label>
+                <input
+                  type="text"
+                  value={settings.whatsappNumber}
+                  onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+                  placeholder="+919876543210"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  ഫോൺ നമ്പർ (Phone)
+                </label>
+                <input
+                  type="text"
+                  value={settings.phone}
+                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                  placeholder="9876543210"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                മദ്റസ അഡ്രസ് (സ്ഥലം)
+              </label>
+              <input
+                type="text"
+                value={settings.address}
+                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                placeholder="മലപ്പുറം, കേരളം"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={settingsSaving}
+              className="py-3 px-6 rounded-xl font-bold text-xs bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 shadow-md flex items-center gap-2 disabled:opacity-60"
+            >
+              <Save className="w-4 h-4" />
+              <span>{settingsSaving ? 'സേവ് ചെയ്യുന്നു...' : 'വിവരങ്ങൾ സേവ് ചെയ്യുക'}</span>
+            </button>
           </form>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-islamic-card rounded-3xl p-6 shadow-2xl border border-tarbiyah-200 dark:border-islamic-border relative">
+            <button
+              onClick={() => setEditingStudent(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-tarbiyah-950 dark:text-white mb-4 flex items-center gap-2">
+              <Edit className="w-4 h-4 text-tarbiyah-700" />
+              <span>വിദ്യാർത്ഥി വിവരങ്ങൾ എഡിറ്റ് ചെയ്യുക</span>
+            </h3>
+
+            <form onSubmit={handleSaveStudentEdit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  വിദ്യാർത്ഥിയുടെ പേര് (Name)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  മൊബൈൽ നമ്പർ (Fixed - മാറ്റാൻ സാധിക്കില്ല)
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingStudent.mobileNumber}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-500 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  പാസ്‌വേഡ് (മാറ്റാൻ ആഗ്രഹിക്കുന്നെങ്കിൽ മാത്രം നൽകുക)
+                </label>
+                <input
+                  type="password"
+                  placeholder="പുതിയ പാസ്‌വേഡ്"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    രക്ഷിതാവിന്റെ പേര്
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.parentName}
+                    onChange={(e) => setEditForm({ ...editForm, parentName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    രക്ഷിതാവിന്റെ ഫോൺ
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.parentMobile}
+                    onChange={(e) => setEditForm({ ...editForm, parentMobile: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  വിലാസം (Address)
+                </label>
+                <input
+                  type="text"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold"
+                >
+                  റദ്ദാക്കുക
+                </button>
+                <button
+                  type="submit"
+                  disabled={studentUpdating}
+                  className="px-5 py-2 rounded-xl bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 text-xs font-bold disabled:opacity-60"
+                >
+                  {studentUpdating ? 'സേവ് ചെയ്യുന്നു...' : 'സേവ് ചെയ്യുക'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

@@ -1,317 +1,309 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useLanguage } from '@/context/LanguageContext';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { BismillahBanner, RubElHizb } from '@/components/common/IslamicMotif';
 import { 
-  BookOpen, 
-  Video, 
-  Tv, 
-  Award, 
-  ShieldCheck, 
-  CheckCircle2, 
-  ArrowRight, 
-  Sparkles, 
-  Users, 
-  Calendar,
-  GraduationCap,
-  School
+  Phone, 
+  Lock, 
+  GraduationCap, 
+  AlertCircle, 
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ShieldAlert,
+  Clock,
+  X
 } from 'lucide-react';
 import { MadrasaSettings } from '@/lib/types';
 
 export default function HomePage() {
+  const router = useRouter();
+  const { user, login, loading: authLoading } = useAuth();
   const { t } = useLanguage();
-  const { user } = useAuth();
+
   const [settings, setSettings] = useState<MadrasaSettings | null>(null);
-  const [stats, setStats] = useState({ students: 0, attendance: 0, liveClasses: 0, certificates: 0 });
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingWarning, setPendingWarning] = useState<string | null>(null);
+
+  // Discreet Admin Modal states
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load madrasa settings
-    fetch('/api/settings').then(r => r.json()).then(d => {
-      if (d.settings) setSettings(d.settings);
-    }).catch(() => {});
+    // If already logged in, route directly to appropriate portal
+    if (!authLoading && user) {
+      if (user.role === 'super_admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+    }
 
-    // Load real stats
-    Promise.all([
-      fetch('/api/students').then(r => r.json()),
-      fetch('/api/live-classes').then(r => r.json()),
-      fetch('/api/certificates').then(r => r.json()),
-      fetch('/api/attendance').then(r => r.json()),
-    ]).then(([stdRes, lcRes, certRes, attRes]) => {
-      const students = stdRes.students || [];
-      const attendance = attRes.records || [];
-      const presentCount = attendance.filter((a: any) => a.status === 'present' || a.status === 'late').length;
-      const avgAtt = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
-      setStats({
-        students: students.filter((s: any) => s.registrationStatus === 'approved').length,
-        liveClasses: (lcRes.classes || []).length,
-        certificates: (certRes.certificates || []).length,
-        attendance: avgAtt
-      });
-    }).catch(() => {});
-  }, []);
+    // Load madrasa settings for dynamic name
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => { if (d.settings) setSettings(d.settings); })
+      .catch(() => {});
+  }, [user, authLoading, router]);
 
-  const madrasaName = settings?.madrasaName || 'Tarbiyah';
-  const principalName = settings?.principalName || '';
-  const description = settings?.description || '';
+  // Handle Student Login
+  const handleStudentLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setPendingWarning(null);
+
+    if (!mobileNumber.trim() || !password.trim()) {
+      setError("ദയവായി മൊബൈൽ നമ്പറും പാസ്‌വേഡും നൽകുക.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await login({ mobileNumber: mobileNumber.trim(), password: password.trim() });
+    setLoading(false);
+
+    if (res.success) {
+      router.push('/dashboard');
+    } else {
+      if (res.status === 'pending') {
+        setPendingWarning("നിങ്ങളുടെ രജിസ്ട്രേഷൻ അഡ്മിൻ അപ്പ്രൂവ് ചെയ്തിട്ടില്ല. ദയവായി കാത്തിരിക്കുക.");
+      } else if (res.status === 'rejected') {
+        setError("നിങ്ങളുടെ അപേക്ഷ നിരസിക്കപ്പെട്ടിരിക്കുന്നു. അഡ്മിനുമായി ബന്ധപ്പെടുക.");
+      } else {
+        setError(res.error || "തെറ്റായ മൊബൈൽ നമ്പർ അല്ലെങ്കിൽ പാസ്‌വേഡ്.");
+      }
+    }
+  };
+
+  // Handle Discreet Admin Login
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+
+    if (!adminPassword.trim()) {
+      setAdminError("പാസ്‌വേഡ് നൽകുക.");
+      return;
+    }
+
+    setAdminLoading(true);
+    const res = await login({ role: 'super_admin', username: 'admin', password: adminPassword.trim() });
+    setAdminLoading(false);
+
+    if (res.success) {
+      setShowAdminModal(false);
+      router.push('/admin');
+    } else {
+      setAdminError(res.error || "തെറ്റായ പാസ്‌വേഡ്. വീണ്ടും ശ്രമിക്കുക.");
+    }
+  };
+
+  const madrasaName = settings?.madrasaName || 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ';
 
   return (
-    <div className="space-y-16 py-4">
+    <div className="min-h-[80vh] flex flex-col justify-between py-2 sm:py-6 max-w-md mx-auto relative px-2">
       
-      {/* Top Bismillah Calligraphy */}
-      <BismillahBanner />
+      {/* Top Bar: Discreet, subtle Admin button at top right - inconspicuous and understated */}
+      <div className="flex items-center justify-between py-1 mb-2">
+        <span className="text-[11px] text-gray-400/60 dark:text-gray-500/60 font-medium">
+          Tarbiyah Portal
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdminModal(true);
+            setAdminError(null);
+            setAdminPassword('');
+          }}
+          className="text-[11px] text-gray-400 hover:text-emerald-700 dark:text-gray-500 dark:hover:text-emerald-400 transition-colors px-2 py-0.5 rounded opacity-60 hover:opacity-100 cursor-pointer"
+          title="Admin"
+        >
+          admin
+        </button>
+      </div>
 
-      {/* Hero Section */}
-      <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-tarbiyah-950 via-tarbiyah-900 to-tarbiyah-800 text-white p-5 sm:p-14 shadow-2xl border border-gold-500/30">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="space-y-4 my-auto">
+        <BismillahBanner />
 
-        <div className="relative z-10 max-w-3xl space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gold-400/10 border border-gold-400/30 text-gold-300 text-xs font-semibold">
-            <School className="w-3.5 h-3.5 text-gold-400 shrink-0" />
-            <span className="truncate">{madrasaName}</span>
+        {/* Main Student Login Card */}
+        <div className="bg-white dark:bg-islamic-card rounded-3xl p-6 sm:p-8 shadow-2xl border border-tarbiyah-100 dark:border-islamic-border">
+          
+          {/* Header & Logo */}
+          <div className="text-center space-y-2 mb-6">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-tarbiyah-900 to-tarbiyah-700 flex items-center justify-center shadow-lg border border-gold-400/40">
+              <RubElHizb className="w-8 h-8 text-gold-400" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white tracking-tight">
+              {madrasaName}
+            </h1>
+            <p className="text-xs text-emerald-800 dark:text-emerald-400 font-semibold">
+              വിദ്യാർത്ഥി ലോഗിൻ (Student Login)
+            </p>
           </div>
 
-          <h1 className="text-3xl sm:text-6xl font-extrabold tracking-tight leading-tight">
-            {madrasaName} <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-300 via-gold-400 to-gold-200">
-              {t.nav.dashboard || 'Islamic Education'}
-            </span>
-          </h1>
-
-          {description ? (
-            <p className="text-sm sm:text-lg text-emerald-100/90 leading-relaxed">{description}</p>
-          ) : (
-            <p className="text-sm sm:text-lg text-emerald-100/90 leading-relaxed">
-              Welcome to <strong className="text-white font-semibold">{madrasaName}</strong>. A digital madrasa platform for managing students, classes, attendance and certificates.
-            </p>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
           )}
 
-          {/* Call to Actions */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 pt-2 sm:pt-4">
-            <Link
-              href={user ? (user.role === 'super_admin' ? '/admin' : '/dashboard') : '/register'}
-              className="inline-flex items-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-400 hover:to-gold-500 text-tarbiyah-950 shadow-lg shadow-gold-500/20 hover:scale-[1.02] transition-all"
+          {/* Pending Approval Notice */}
+          {pendingWarning && (
+            <div className="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
+              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <p className="font-bold mb-1">അഡ്മിൻ അപ്പ്രൂവൽ ആവശ്യമാണ്</p>
+                <p>{pendingWarning}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleStudentLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                മൊബൈൽ നമ്പർ (Mobile Number)
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="tel"
+                  required
+                  placeholder="10 അക്ക മൊബൈൽ നമ്പർ"
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50/60 dark:bg-islamic-dark text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-tarbiyah-700 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                പാസ്‌വേഡ് (Password)
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="പാസ്‌വേഡ് നൽകുക"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-11 py-3 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50/60 dark:bg-islamic-dark text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-tarbiyah-700 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-tarbiyah-800 to-tarbiyah-900 hover:from-tarbiyah-700 hover:to-tarbiyah-800 text-gold-300 shadow-lg shadow-tarbiyah-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 border border-gold-500/20 disabled:opacity-60"
             >
-              <span>{user ? t.nav.dashboard : t.auth.registerBtn}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-gold-300 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>ലോഗിൻ ചെയ്യുക (Login)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
 
-            <Link
-              href="/quran-module"
-              className="inline-flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/20 transition-all"
+          {/* Small Register Link at Bottom */}
+          <div className="mt-6 pt-5 border-t border-gray-100 dark:border-islamic-border text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              പുതിയ വിദ്യാർത്ഥിയാണോ?{' '}
+              <Link
+                href="/register"
+                className="font-bold text-tarbiyah-800 dark:text-gold-400 hover:underline inline-flex items-center gap-1"
+              >
+                രജിസ്റ്റർ ചെയ്യുക (Register)
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Secret / Discreet Admin Access Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-xs bg-white dark:bg-islamic-card rounded-2xl p-5 shadow-2xl border border-tarbiyah-200 dark:border-islamic-border relative">
+            <button
+              onClick={() => setShowAdminModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1"
             >
-              <BookOpen className="w-4 h-4 text-gold-400" />
-              <span>{t.nav.quranModule}</span>
-            </Link>
+              <X className="w-4 h-4" />
+            </button>
 
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 sm:py-3.5 rounded-xl font-semibold text-xs text-gold-300/80 hover:text-gold-200 hover:underline"
-            >
-              <ShieldCheck className="w-4 h-4 text-gold-400" />
-              <span>Admin Portal</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Decorative Watermark Arch */}
-        <div className="hidden lg:block absolute -bottom-10 right-10 opacity-15">
-          <RubElHizb className="w-80 h-80 text-gold-300" />
-        </div>
-      </section>
-
-      {/* Metrics Banner — shows live data */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
-        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex items-center gap-2.5 sm:gap-4 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-tarbiyah-50 dark:bg-tarbiyah-900/60 flex items-center justify-center text-tarbiyah-700 dark:text-gold-400 shrink-0">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.students}</p>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Students Enrolled</p>
-          </div>
-        </div>
-
-        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex items-center gap-2.5 sm:gap-4 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gold-50 dark:bg-gold-950/60 flex items-center justify-center text-gold-600 dark:text-gold-400 shrink-0">
-            <Video className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.liveClasses}</p>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Live Classes</p>
-          </div>
-        </div>
-
-        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex items-center gap-2.5 sm:gap-4 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-            <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">
-              {stats.attendance > 0 ? `${stats.attendance}%` : '—'}
-            </p>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Attendance</p>
-          </div>
-        </div>
-
-        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex items-center gap-2.5 sm:gap-4 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
-            <Award className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.certificates}</p>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Certificates</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Six Feature Cards */}
-      <section className="space-y-6">
-        <div className="text-center max-w-2xl mx-auto space-y-2">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-tarbiyah-950 dark:text-white">
-            Curriculum & Learning Ecosystem
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Designed for modern madrasas with seamless progress monitoring.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          <Link 
-            href="/quran-module"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-tarbiyah-900 text-gold-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <BookOpen className="w-6 h-6" />
+            <div className="text-center space-y-1 mb-4">
+              <div className="w-10 h-10 mx-auto rounded-xl bg-tarbiyah-900 flex items-center justify-center text-gold-400 mb-2">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-sm text-tarbiyah-950 dark:text-white">
+                അഡ്മിൻ പ്രവേശനം
+              </h3>
+              <p className="text-[11px] text-gray-500">
+                തുടരാൻ പാസ്‌വേഡ് നൽകുക
+              </p>
             </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Interactive Quran Module
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Qaida Nooraniyah, Quran recitation (Tilawah), Tajweed articulation, and daily Hifz memorization tracking.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              Explore Quran Module <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
 
-          <Link 
-            href="/live-classes"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-tarbiyah-800 text-gold-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Video className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Virtual Live Classrooms
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              1-click entry via Zoom and Google Meet. Class schedules, countdown timers, and attendance monitoring.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              Join Live Classes <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
+            {adminError && (
+              <div className="mb-3 p-2 rounded-lg bg-red-50 text-red-700 text-[11px] text-center font-medium border border-red-200">
+                {adminError}
+              </div>
+            )}
 
-          <Link 
-            href="/recorded-classes"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-tarbiyah-950 text-gold-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tv className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Recorded Video Vault
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              High-speed video library organized by subject and level (Beginner to Advanced) with watch history.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              Browse Videos <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
+            <form onSubmit={handleAdminLogin} className="space-y-3">
+              <input
+                type="password"
+                required
+                autoFocus
+                placeholder="പാസ്‌വേഡ് നൽകുക"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="w-full px-3 py-2.5 text-center tracking-widest text-lg rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark focus:outline-none focus:ring-2 focus:ring-tarbiyah-700 font-mono"
+              />
 
-          <Link 
-            href="/programs"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-gold-600 text-tarbiyah-950 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Award className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Programs & Events
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Manage Musabaqa, competitions, camps, workshops, and student participation registration.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              View Events & Programs <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
-
-          <Link 
-            href="/certificates"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-emerald-800 text-gold-300 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Verifiable Certificates
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Auto-generated digital credentials with unique verification codes and QR codes, printable in PDF.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              Certificate Verification <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
-
-          <Link 
-            href="/admin"
-            className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-tarbiyah-900 text-gold-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Admin Control Panel
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Approve/reject student admissions, manage teachers, monitor attendance, export reports, and configure madrasa settings.
-            </p>
-            <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
-              Access Admin Hub <ArrowRight className="w-3.5 h-3.5" />
-            </span>
-          </Link>
-
+              <button
+                type="submit"
+                disabled={adminLoading}
+                className="w-full py-2.5 rounded-xl font-bold text-xs bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 shadow-md transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {adminLoading ? (
+                  <div className="w-4 h-4 border-2 border-gold-300 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span>തുടങ്ങുക</span>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
-      </section>
+      )}
 
-      {/* Quick Registration Banner */}
-      <section className="p-5 sm:p-10 rounded-3xl bg-gradient-to-r from-tarbiyah-900 to-tarbiyah-950 text-white flex flex-col md:flex-row items-center justify-between gap-6 border border-gold-500/40 shadow-xl">
-        <div className="space-y-2 text-center md:text-left">
-          <span className="text-xs font-bold uppercase tracking-wider text-gold-400">
-            Admissions Open {settings?.admissionYear || new Date().getFullYear()}
-          </span>
-          <h3 className="text-xl sm:text-3xl font-bold">
-            {settings?.madrasaName ? `Join ${settings.madrasaName} Today` : 'Begin Your Journey Today'}
-          </h3>
-          <p className="text-xs sm:text-sm text-emerald-100/80 max-w-xl">
-            Register as a student. Our academic panel will review and verify your admission shortly.
-          </p>
-        </div>
-        <Link
-          href="/register"
-          className="w-full md:w-auto text-center whitespace-nowrap px-8 py-3.5 rounded-xl font-bold text-sm bg-gold-500 hover:bg-gold-400 text-tarbiyah-950 shadow-lg transition-transform hover:scale-105"
-        >
-          {t.auth.registerBtn}
-        </Link>
-      </section>
+      {/* Discreet Footer Note */}
+      <div className="text-center py-2">
+        <p className="text-[10px] text-gray-400">
+          © {new Date().getFullYear()} {madrasaName}
+        </p>
+      </div>
 
     </div>
   );

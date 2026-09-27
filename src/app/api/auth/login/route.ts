@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
     // 1. Super Admin Authentication Check
     if (role === 'super_admin' || username === 'admin') {
-      if (username === 'admin' && password === '4321') {
+      if (password === '4321') {
         const session: UserSession = {
           id: 'admin-super-01',
           name: 'Super Admin',
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         });
         return response;
       }
-      return NextResponse.json({ error: "Invalid Admin username or password." }, { status: 401 });
+      return NextResponse.json({ error: "തെറ്റായ അഡ്മിൻ പാസ്സ്‌വേർഡ്. (Incorrect Password)" }, { status: 401 });
     }
 
     // 2. Student Authentication Check

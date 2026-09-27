@@ -6,6 +6,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { InstallPWA } from '@/components/common/InstallPWA';
+import { WhatsAppButton } from '@/components/common/WhatsAppButton';
 import { BottomNav } from '@/components/layout/BottomNav';
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ export default function RootLayout({
                 {children}
               </main>
               <BottomNav />
+              <WhatsAppButton />
               <InstallPWA />
               <Footer />
             </AuthProvider>

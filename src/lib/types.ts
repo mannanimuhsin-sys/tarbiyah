@@ -48,17 +48,17 @@ export interface Teacher {
 export interface LiveClass {
   id: string;
   title: string;
-  subject: SubjectType;
-  teacherId: string;
-  teacherName: string;
-  provider: LiveProvider;
   meetingLink: string;
+  startTime: string; // ISO string or time string
+  durationMinutes?: number;
+  subject?: SubjectType;
+  teacherId?: string;
+  teacherName?: string;
+  provider?: LiveProvider;
   meetingId?: string;
   meetingPasscode?: string;
-  startTime: string; // ISO string
-  durationMinutes: number;
-  level: string;
-  status: 'scheduled' | 'live' | 'completed';
+  level?: string;
+  status?: 'scheduled' | 'live' | 'completed';
   description?: string;
 }
 
@@ -66,14 +66,16 @@ export interface RecordedClass {
   id: string;
   title: string;
   description: string;
-  subject: SubjectType;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  teacherName: string;
-  videoUrl: string; // R2 / HLS / MP4
+  classNumber?: string; // e.g. "ക്ലാസ് 1", "ക്ലാസ് 2" etc.
+  youtubeUrl?: string;  // Direct YouTube link
+  videoUrl: string;     // YouTube or video URL
+  subject?: SubjectType;
+  level?: string;
+  teacherName?: string;
   thumbnailUrl?: string;
-  durationSeconds: number;
-  viewsCount: number;
-  tags: string[];
+  durationSeconds?: number;
+  viewsCount?: number;
+  tags?: string[];
   createdAt: string;
 }
 
