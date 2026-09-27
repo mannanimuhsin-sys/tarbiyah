@@ -1,0 +1,100 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #fcfdfc;
+  --bg-secondary: #f3f7f4;
+  --text-primary: #0f241d;
+  --text-secondary: #3b5249;
+  --border-color: #e2ede6;
+  --gold-accent: #d97706;
+}
+
+.dark {
+  --bg-primary: #07130e;
+  --bg-secondary: #0c1f17;
+  --text-primary: #f2f7f4;
+  --text-secondary: #9cb3a8;
+  --border-color: #17382b;
+  --gold-accent: #f59e0b;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans Malayalam', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+.font-arabic {
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+}
+
+.font-malayalam {
+  font-family: 'Noto Sans Malayalam', sans-serif;
+}
+
+/* Islamic Geometric Background subtle pattern */
+.bg-islamic-stars {
+  background-image: radial-gradient(rgba(16, 185, 129, 0.08) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+}
+
+.dark .bg-islamic-stars {
+  background-image: radial-gradient(rgba(245, 158, 11, 0.07) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+}
+
+/* Gold Gradient Shimmer */
+.gold-gradient {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #b45309 100%);
+}
+
+.emerald-gradient {
+  background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #065f46 100%);
+}
+
+.gold-border {
+  border-image: linear-gradient(to right, #d97706, #fbbf24, #d97706) 1;
+}
+
+/* Custom Islamic Card Shadows */
+.islamic-card {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.islamic-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(6, 78, 59, 0.15);
+}
+
+.dark .islamic-card:hover {
+  box-shadow: 0 12px 24px -10px rgba(245, 158, 11, 0.15);
+}
+
+/* Certificate Print Specific Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .certificate-frame {
+    box-shadow: none !important;
+    border: 8px double #a16207 !important;
+    width: 100% !important;
+    page-break-inside: avoid;
+  }
+}
