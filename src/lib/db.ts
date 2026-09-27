@@ -9,7 +9,8 @@ import {
   Program, 
   NotificationItem, 
   Certificate, 
-  ProgressReport 
+  ProgressReport,
+  MadrasaSettings
 } from './types';
 
 interface DatabaseData {
@@ -22,6 +23,7 @@ interface DatabaseData {
   notifications: NotificationItem[];
   certificates: Certificate[];
   progressReports: ProgressReport[];
+  settings: MadrasaSettings;
 }
 
 const DB_DIR = path.join(process.cwd(), '.data');
@@ -29,323 +31,25 @@ const DB_FILE = path.join(DB_DIR, 'tarbiyah_db.json');
 
 const INITIAL_DATA: DatabaseData = {
   students: [],
-  teachers: [
-    {
-      id: "tch-001",
-      fullName: "Ustadh Abdullah Al-Azhari",
-      email: "abdullah@tarbiyah.edu",
-      mobileNumber: "9900112233",
-      qualification: "M.A. Islamic Studies (Al-Azhar University, Cairo)",
-      specialization: "Tajweed & Qira'at",
-      bio: "Certified in 10 Qira'at with Ijazah sanad connected to Prophet Muhammad ﷺ. Over 15 years teaching experience.",
-      isActive: true,
-      assignedClassesCount: 4,
-      createdAt: "2025-10-01T00:00:00Z"
-    },
-    {
-      id: "tch-002",
-      fullName: "Qari Bilal Mansoor",
-      email: "bilal@tarbiyah.edu",
-      mobileNumber: "9900112244",
-      qualification: "Hafiz-ul-Quran, Sanad in Hafs 'an Asim",
-      specialization: "Hifz Intensive & Revision",
-      bio: "Completed Quran memorization at age 11. Guided over 80 students to complete full Quran Hifz.",
-      isActive: true,
-      assignedClassesCount: 6,
-      createdAt: "2025-10-15T00:00:00Z"
-    },
-    {
-      id: "tch-003",
-      fullName: "Ustadha Aishah Siddiqa",
-      email: "aishah@tarbiyah.edu",
-      mobileNumber: "9900112255",
-      qualification: "B.Ed Arabic & Noorani Qaida Certified",
-      specialization: "Qaida Nooraniyah & Children Foundation",
-      bio: "Specialist in child phonetics and joyful Quran foundation training for young minds.",
-      isActive: true,
-      assignedClassesCount: 3,
-      createdAt: "2025-11-01T00:00:00Z"
-    }
-  ],
-  liveClasses: [
-    {
-      id: "live-001",
-      title: "Morning Hifz & Muraja'ah Circle",
-      subject: "hifz",
-      teacherId: "tch-002",
-      teacherName: "Qari Bilal Mansoor",
-      provider: "zoom",
-      meetingLink: "https://zoom.us/j/9871234567?pwd=tarbiyahhifzcircle",
-      meetingId: "987 123 4567",
-      meetingPasscode: "tarbiyah2026",
-      startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-      durationMinutes: 45,
-      level: "Intermediate & Advanced",
-      status: "scheduled",
-      description: "Daily dawn memorization review and pronunciation check for Juz 1 to 15."
-    },
-    {
-      id: "live-002",
-      title: "Mastering Makharij (Tajweed Principles)",
-      subject: "tajweed",
-      teacherId: "tch-001",
-      teacherName: "Ustadh Abdullah Al-Azhari",
-      provider: "google_meet",
-      meetingLink: "https://meet.google.com/qur-anbt-tar",
-      meetingId: "qur-anbt-tar",
-      startTime: new Date(Date.now() + 86400000).toISOString(), // tomorrow
-      durationMinutes: 60,
-      level: "All Levels",
-      status: "scheduled",
-      description: "Interactive pronunciation lab focusing on throat and tongue articulation points."
-    },
-    {
-      id: "live-003",
-      title: "Qaida Nooraniyah - Lesson 8: Tanween & Sukoon",
-      subject: "qaida",
-      teacherId: "tch-003",
-      teacherName: "Ustadha Aishah Siddiqa",
-      provider: "zoom",
-      meetingLink: "https://zoom.us/j/8451122334?pwd=nooraniyahkids",
-      meetingId: "845 112 2334",
-      meetingPasscode: "noor786",
-      startTime: new Date(Date.now() + 172800000).toISOString(),
-      durationMinutes: 40,
-      level: "Beginner",
-      status: "scheduled",
-      description: "Step-by-step spelling and phonetic joining for young beginners."
-    }
-  ],
-  recordedClasses: [
-    {
-      id: "rec-001",
-      title: "Complete Qaida Nooraniyah - Lesson 1 to 5 Foundational Letters",
-      description: "Full guide to Arabic alphabet phonetics with standard Tajweed pronunciation rules.",
-      subject: "qaida",
-      level: "Beginner",
-      teacherName: "Ustadha Aishah Siddiqa",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", // Cloudflare R2 streaming compatible
-      thumbnailUrl: "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=600&auto=format&fit=crop&q=80",
-      durationSeconds: 1420,
-      viewsCount: 342,
-      tags: ["Qaida", "Pronunciation", "Beginners"],
-      createdAt: "2026-01-20T00:00:00Z"
-    },
-    {
-      id: "rec-002",
-      title: "The Rules of Noon Sakinah & Tanween: Izhar, Idgham, Iqlab, Ikhfa",
-      description: "Comprehensive demonstration with verses from Juz Amma and Juz Tabarak.",
-      subject: "tajweed",
-      level: "Intermediate",
-      teacherName: "Ustadh Abdullah Al-Azhari",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-      thumbnailUrl: "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=600&auto=format&fit=crop&q=80",
-      durationSeconds: 2150,
-      viewsCount: 689,
-      tags: ["Tajweed", "Noon Sakinah", "Idgham", "Ikhfa"],
-      createdAt: "2026-02-14T00:00:00Z"
-    },
-    {
-      id: "rec-003",
-      title: "Surah Al-Mulk: Word by Word Recitation & Meaning Breakdown",
-      description: "Learn to recite Surah Al-Mulk with proper stops (Waqf) and spiritual reflections.",
-      subject: "quran_reading",
-      level: "Intermediate",
-      teacherName: "Qari Bilal Mansoor",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-      thumbnailUrl: "https://images.unsplash.com/photo-1542816417-0983c9c9ad53?w=600&auto=format&fit=crop&q=80",
-      durationSeconds: 1890,
-      viewsCount: 512,
-      tags: ["Surah Al-Mulk", "Recitation", "Waqf"],
-      createdAt: "2026-03-05T00:00:00Z"
-    },
-    {
-      id: "rec-004",
-      title: "Hifz Strategy: Long-Term Memory Retention Techniques",
-      description: "Proven cognitive methods for preserving Quran memorization without forgetting.",
-      subject: "hifz",
-      level: "Advanced",
-      teacherName: "Qari Bilal Mansoor",
-      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-      thumbnailUrl: "https://images.unsplash.com/photo-1519817650390-64a93db51149?w=600&auto=format&fit=crop&q=80",
-      durationSeconds: 1640,
-      viewsCount: 890,
-      tags: ["Hifz", "Memory", "Muraja'ah"],
-      createdAt: "2026-04-12T00:00:00Z"
-    }
-  ],
-  attendance: [
-    {
-      id: "att-001",
-      studentId: "std-001",
-      studentName: "Zayd Muhammad",
-      date: "2026-09-25",
-      status: "present",
-      remarks: "Excellent recitation in Surah Al-Kahf",
-      markedBy: "Qari Bilal Mansoor"
-    },
-    {
-      id: "att-002",
-      studentId: "std-002",
-      studentName: "Fatimah Zahra",
-      date: "2026-09-25",
-      status: "present",
-      remarks: "Accurate Tajweed with flawless Madd",
-      markedBy: "Ustadh Abdullah Al-Azhari"
-    },
-    {
-      id: "att-003",
-      studentId: "std-005",
-      studentName: "Umar Faris",
-      date: "2026-09-25",
-      status: "late",
-      remarks: "Joined 10 mins late due to prayer time",
-      markedBy: "Ustadh Abdullah Al-Azhari"
-    },
-    {
-      id: "att-004",
-      studentId: "std-001",
-      studentName: "Zayd Muhammad",
-      date: "2026-09-26",
-      status: "present",
-      remarks: "Daily Hifz target completed",
-      markedBy: "Qari Bilal Mansoor"
-    },
-    {
-      id: "att-005",
-      studentId: "std-002",
-      studentName: "Fatimah Zahra",
-      date: "2026-09-26",
-      status: "present",
-      remarks: "Perfect Muraja'ah of Juz 14",
-      markedBy: "Qari Bilal Mansoor"
-    }
-  ],
-  programs: [
-    {
-      id: "prg-001",
-      title: "State Level Musabaqa Tilawat-il-Quran 2026",
-      category: "Musabaqa",
-      description: "Prestigious annual Quran recitation competition with renowned judges and certified sanad accolades.",
-      startDate: "2026-10-15",
-      endDate: "2026-10-18",
-      venueOrLink: "Tarbiyah Grand Auditorium & Live Broadcast",
-      rules: "Recitation from memory with accurate Tajweed. Categories: Under 12, Under 18, and Open Hifz.",
-      rewards: "Gold Trophy, Cash Award ₹50,000, and Official Sanad Certificate.",
-      isActive: true,
-      registeredStudentIds: ["std-001", "std-002"]
-    },
-    {
-      id: "prg-002",
-      title: "Ramadan Hifz Accelerator Camp",
-      category: "Annual Program",
-      description: "Intensive 30-day spiritual and memorization camp dedicated to completing 3 new Ajza' with perfection.",
-      startDate: "2026-11-01",
-      endDate: "2026-11-30",
-      venueOrLink: "Online Interactive Zoom Hubs",
-      rules: "Mandatory daily attendance, daily dawn tasmee' (listening session), and evening tafseer.",
-      rewards: "Completion Certificate and Special Madrasa Honor Roll.",
-      isActive: true,
-      registeredStudentIds: ["std-002", "std-005"]
-    },
-    {
-      id: "prg-003",
-      title: "Islamic Adab & Character Building Workshop",
-      category: "Islamic Competition",
-      description: "Interactive ethics and character program covering Prophetic manners (Shama'il) and filial piety (Birr al-Walidayn).",
-      startDate: "2026-10-05",
-      endDate: "2026-10-07",
-      venueOrLink: "Google Meet Virtual Hall",
-      rules: "Open for all enrolled students and parents.",
-      rewards: "Tarbiyah Akhlaq Excellence Badge.",
-      isActive: true,
-      registeredStudentIds: ["std-001", "std-005"]
-    }
-  ],
-  notifications: [
-    {
-      id: "notif-001",
-      title: "Registration Approved!",
-      message: "Congratulations! Your admission to Tarbiyah Islamic Education Platform has been approved by the Principal.",
-      type: "system",
-      targetRole: "student",
-      studentId: "std-001",
-      isRead: false,
-      createdAt: "2026-09-24T10:00:00Z"
-    },
-    {
-      id: "notif-002",
-      title: "Upcoming Live Class Reminder",
-      message: "Morning Hifz & Muraja'ah Circle starts in 1 hour. Please join via Zoom with your Mushaf ready.",
-      type: "class_reminder",
-      targetRole: "all",
-      isRead: false,
-      createdAt: "2026-09-26T06:00:00Z"
-    },
-    {
-      id: "notif-003",
-      title: "Musabaqa 2026 Registration Open",
-      message: "Registration for the State Level Musabaqa Tilawat-il-Quran is now live. Enroll through the Programs tab.",
-      type: "announcement",
-      targetRole: "all",
-      isRead: true,
-      createdAt: "2026-09-23T08:30:00Z"
-    }
-  ],
-  certificates: [
-    {
-      id: "cert-001",
-      certificateNumber: "TRB-2026-HIFZ-089",
-      studentId: "std-001",
-      studentName: "Zayd Muhammad",
-      courseOrAchievement: "Completion of 5 Ajza' Hifz with Distinction",
-      issueDate: "2026-08-15",
-      grade: "Mumtaz (Excellence 96%)",
-      verificationCode: "TRB-VERIF-987654-ZM",
-      qrCodeData: "https://tarbiyah.edu/verify/TRB-VERIF-987654-ZM"
-    },
-    {
-      id: "cert-002",
-      certificateNumber: "TRB-2026-TAJW-104",
-      studentId: "std-002",
-      studentName: "Fatimah Zahra",
-      courseOrAchievement: "Advanced Tajweed & Theoretical Rules Certification",
-      issueDate: "2026-07-20",
-      grade: "Mumtaz Sharaf (Highest Honors 99%)",
-      verificationCode: "TRB-VERIF-543210-FZ",
-      qrCodeData: "https://tarbiyah.edu/verify/TRB-VERIF-543210-FZ"
-    }
-  ],
-  progressReports: [
-    {
-      id: "rep-001",
-      studentId: "std-001",
-      studentName: "Zayd Muhammad",
-      reportMonth: "September 2026",
-      attendanceRate: 94.5,
-      qaidaProgress: 100,
-      tajweedScore: 92,
-      hifzSurahs: ["Al-Kahf", "Maryam", "Ta-Ha", "Al-Anbiya"],
-      revisionQuality: "Excellent (Mumtaz)",
-      teacherNotes: "Displays profound respect and consistency. Voice projection and Makharij are very precise.",
-      conduct: "Exemplary",
-      generatedDate: "2026-09-25"
-    },
-    {
-      id: "rep-002",
-      studentId: "std-002",
-      studentName: "Fatimah Zahra",
-      reportMonth: "September 2026",
-      attendanceRate: 98.0,
-      qaidaProgress: 100,
-      tajweedScore: 99,
-      hifzSurahs: ["Al-Baqarah", "Aal-Imran", "An-Nisa", "Al-Ma'idah", "Al-An'am"],
-      revisionQuality: "Flawless Memorization",
-      teacherNotes: "Exceptional student. Ready for national Musabaqa entry in category 15 Juz.",
-      conduct: "Outstanding",
-      generatedDate: "2026-09-25"
-    }
-  ]
+  teachers: [],
+  liveClasses: [],
+  recordedClasses: [],
+  attendance: [],
+  programs: [],
+  notifications: [],
+  certificates: [],
+  progressReports: [],
+  settings: {
+    madrasaName: '',
+    principalName: '',
+    address: '',
+    phone: '',
+    email: '',
+    description: '',
+    admissionYear: new Date().getFullYear().toString(),
+    whatsappNumber: '',
+    websiteUrl: ''
+  }
 };
 
 // Ensure directory and load or initialize data
@@ -621,5 +325,20 @@ export const db = {
   },
   getStudentReport: (studentId: string): ProgressReport | undefined => {
     return loadDatabase().progressReports.find(r => r.studentId === studentId);
+  },
+
+  // Madrasa Settings
+  getSettings: (): MadrasaSettings => {
+    const data = loadDatabase();
+    return data.settings || {
+      madrasaName: '', principalName: '', address: '', phone: '',
+      email: '', description: '', admissionYear: '', whatsappNumber: '', websiteUrl: ''
+    };
+  },
+  updateSettings: (settings: MadrasaSettings): MadrasaSettings => {
+    const data = loadDatabase();
+    data.settings = settings;
+    saveDatabase(data);
+    return settings;
   }
 };

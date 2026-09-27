@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -16,12 +16,46 @@ import {
   Sparkles, 
   Users, 
   Calendar,
-  GraduationCap
+  GraduationCap,
+  School
 } from 'lucide-react';
+import { MadrasaSettings } from '@/lib/types';
 
 export default function HomePage() {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const [settings, setSettings] = useState<MadrasaSettings | null>(null);
+  const [stats, setStats] = useState({ students: 0, attendance: 0, liveClasses: 0, certificates: 0 });
+
+  useEffect(() => {
+    // Load madrasa settings
+    fetch('/api/settings').then(r => r.json()).then(d => {
+      if (d.settings) setSettings(d.settings);
+    }).catch(() => {});
+
+    // Load real stats
+    Promise.all([
+      fetch('/api/students').then(r => r.json()),
+      fetch('/api/live-classes').then(r => r.json()),
+      fetch('/api/certificates').then(r => r.json()),
+      fetch('/api/attendance').then(r => r.json()),
+    ]).then(([stdRes, lcRes, certRes, attRes]) => {
+      const students = stdRes.students || [];
+      const attendance = attRes.records || [];
+      const presentCount = attendance.filter((a: any) => a.status === 'present' || a.status === 'late').length;
+      const avgAtt = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
+      setStats({
+        students: students.filter((s: any) => s.registrationStatus === 'approved').length,
+        liveClasses: (lcRes.classes || []).length,
+        certificates: (certRes.certificates || []).length,
+        attendance: avgAtt
+      });
+    }).catch(() => {});
+  }, []);
+
+  const madrasaName = settings?.madrasaName || 'Tarbiyah';
+  const principalName = settings?.principalName || '';
+  const description = settings?.description || '';
 
   return (
     <div className="space-y-16 py-4">
@@ -36,21 +70,24 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gold-400/10 border border-gold-400/30 text-gold-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-gold-400 shrink-0" />
-            <span className="truncate">Islamic Education Reimagined with Modern Technology</span>
+            <School className="w-3.5 h-3.5 text-gold-400 shrink-0" />
+            <span className="truncate">{madrasaName}</span>
           </div>
 
           <h1 className="text-3xl sm:text-6xl font-extrabold tracking-tight leading-tight">
-            Learn Quran. <br />
+            {madrasaName} <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-300 via-gold-400 to-gold-200">
-              Build Character.
-            </span> <br />
-            Grow in Faith.
+              {t.nav.dashboard || 'Islamic Education'}
+            </span>
           </h1>
 
-          <p className="text-sm sm:text-lg text-emerald-100/90 leading-relaxed">
-            Welcome to <strong className="text-white font-semibold">Tarbiyah (തർബിയ്യ)</strong>. A comprehensive digital madrasa platform uniting authentic Quranic scholarship, Tajweed precision, live interactive circles, and character tracking.
-          </p>
+          {description ? (
+            <p className="text-sm sm:text-lg text-emerald-100/90 leading-relaxed">{description}</p>
+          ) : (
+            <p className="text-sm sm:text-lg text-emerald-100/90 leading-relaxed">
+              Welcome to <strong className="text-white font-semibold">{madrasaName}</strong>. A digital madrasa platform for managing students, classes, attendance and certificates.
+            </p>
+          )}
 
           {/* Call to Actions */}
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 pt-2 sm:pt-4">
@@ -86,14 +123,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Metrics Banner */}
+      {/* Metrics Banner — shows live data */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border shadow-sm flex items-center gap-2.5 sm:gap-4 min-w-0">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-tarbiyah-50 dark:bg-tarbiyah-900/60 flex items-center justify-center text-tarbiyah-700 dark:text-gold-400 shrink-0">
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">1,240+</p>
+            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.students}</p>
             <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Students Enrolled</p>
           </div>
         </div>
@@ -103,7 +140,7 @@ export default function HomePage() {
             <Video className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">450+</p>
+            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.liveClasses}</p>
             <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Live Classes</p>
           </div>
         </div>
@@ -113,7 +150,9 @@ export default function HomePage() {
             <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">96.4%</p>
+            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">
+              {stats.attendance > 0 ? `${stats.attendance}%` : '—'}
+            </p>
             <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Attendance</p>
           </div>
         </div>
@@ -123,26 +162,25 @@ export default function HomePage() {
             <Award className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">320+</p>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Sanads</p>
+            <p className="text-xl sm:text-2xl font-black text-tarbiyah-950 dark:text-white truncate">{stats.certificates}</p>
+            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium truncate">Certificates</p>
           </div>
         </div>
       </section>
 
-      {/* Six Pillars of Tarbiyah Platform */}
+      {/* Six Feature Cards */}
       <section className="space-y-6">
         <div className="text-center max-w-2xl mx-auto space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-tarbiyah-950 dark:text-white">
             Curriculum & Learning Ecosystem
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Designed specifically for modern madrasas, students, and parents with seamless progress monitoring.
+            Designed for modern madrasas with seamless progress monitoring.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* Card 1: Quran Learning */}
           <Link 
             href="/quran-module"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -154,14 +192,13 @@ export default function HomePage() {
               Interactive Quran Module
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Step-by-step Qaida Nooraniyah, Quran recitation (Tilawah), Tajweed articulation points, and daily Hifz memorization & Muraja'ah tracking.
+              Qaida Nooraniyah, Quran recitation (Tilawah), Tajweed articulation, and daily Hifz memorization tracking.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               Explore Quran Module <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
-          {/* Card 2: Live Classes */}
           <Link 
             href="/live-classes"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -173,14 +210,13 @@ export default function HomePage() {
               Virtual Live Classrooms
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Seamless 1-click entry via Zoom and Google Meet. Automated class schedule alerts, countdown timers, and teacher presence monitoring.
+              1-click entry via Zoom and Google Meet. Class schedules, countdown timers, and attendance monitoring.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               Join Live Classes <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
-          {/* Card 3: Recorded Video Vault */}
           <Link 
             href="/recorded-classes"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -192,14 +228,13 @@ export default function HomePage() {
               Recorded Video Vault
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Cloudflare R2 powered high-speed video library organized by Subject and Level (Beginner to Advanced) with watch history.
+              High-speed video library organized by subject and level (Beginner to Advanced) with watch history.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               Browse Videos <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
-          {/* Card 4: Programs & Musabaqa */}
           <Link 
             href="/programs"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -208,17 +243,16 @@ export default function HomePage() {
               <Award className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Musabaqa & Competitions
+              Programs & Events
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              State-level Quran recitation contests, Ramadan Hifz camps, Islamic ethics symposiums, and student participation registration.
+              Manage Musabaqa, competitions, camps, workshops, and student participation registration.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               View Events & Programs <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
-          {/* Card 5: Certificate System */}
           <Link 
             href="/certificates"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -230,14 +264,13 @@ export default function HomePage() {
               Verifiable Certificates
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Auto-generated digital credentials with unique verification codes and QR codes, fully printable in PDF format.
+              Auto-generated digital credentials with unique verification codes and QR codes, printable in PDF.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               Certificate Verification <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
-          {/* Card 6: Super Admin Management */}
           <Link 
             href="/admin"
             className="group p-6 rounded-2xl bg-white dark:bg-islamic-card border border-tarbiyah-100 dark:border-islamic-border hover:border-gold-400/60 shadow-sm transition-all hover:shadow-xl space-y-4"
@@ -246,10 +279,10 @@ export default function HomePage() {
               <ShieldCheck className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white group-hover:text-gold-600 dark:group-hover:text-gold-400">
-              Admin & Teacher Control
+              Admin Control Panel
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-              Approve/reject student admissions, assign teachers, monitor attendance, export Excel/PDF reports, and broadcast push alerts.
+              Approve/reject student admissions, manage teachers, monitor attendance, export reports, and configure madrasa settings.
             </p>
             <span className="inline-flex items-center text-xs font-bold text-gold-600 dark:text-gold-400 gap-1 group-hover:translate-x-1 transition-transform">
               Access Admin Hub <ArrowRight className="w-3.5 h-3.5" />
@@ -263,13 +296,13 @@ export default function HomePage() {
       <section className="p-5 sm:p-10 rounded-3xl bg-gradient-to-r from-tarbiyah-900 to-tarbiyah-950 text-white flex flex-col md:flex-row items-center justify-between gap-6 border border-gold-500/40 shadow-xl">
         <div className="space-y-2 text-center md:text-left">
           <span className="text-xs font-bold uppercase tracking-wider text-gold-400">
-            Admissions Open 2026
+            Admissions Open {settings?.admissionYear || new Date().getFullYear()}
           </span>
           <h3 className="text-xl sm:text-3xl font-bold">
-            Begin Your Quran & Character Journey Today
+            {settings?.madrasaName ? `Join ${settings.madrasaName} Today` : 'Begin Your Journey Today'}
           </h3>
           <p className="text-xs sm:text-sm text-emerald-100/80 max-w-xl">
-            Register as a student with your personal and guardian information. Our academic panel will review and verify your admission within 24 hours.
+            Register as a student. Our academic panel will review and verify your admission shortly.
           </p>
         </div>
         <Link

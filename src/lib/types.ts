@@ -147,3 +147,15 @@ export interface UserSession {
   mobileNumber?: string;
   username?: string;
 }
+
+export interface MadrasaSettings {
+  madrasaName: string;
+  principalName: string;
+  address: string;
+  phone: string;
+  email: string;
+  description: string;
+  admissionYear: string;
+  whatsappNumber: string;
+  websiteUrl: string;
+}

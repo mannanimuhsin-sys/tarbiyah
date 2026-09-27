@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { Student, Teacher, LiveClass, RecordedClass, AttendanceRecord } from '@/lib/types';
+import { Student, Teacher, LiveClass, RecordedClass, AttendanceRecord, MadrasaSettings } from '@/lib/types';
 import { 
   Users, 
   CheckCircle, 
@@ -27,7 +27,10 @@ import {
   UserCheck, 
   Sparkles,
   Phone,
-  RefreshCw
+  RefreshCw,
+  Settings,
+  Save,
+  School
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
@@ -35,7 +38,7 @@ export default function AdminDashboardPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'teachers' | 'attendance' | 'classes' | 'certificates'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'teachers' | 'attendance' | 'classes' | 'certificates' | 'settings'>('overview');
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -45,6 +48,13 @@ export default function AdminDashboardPage() {
   const [recordedClasses, setRecordedClasses] = useState<RecordedClass[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [madrasaSettings, setMadrasaSettings] = useState<MadrasaSettings>({
+    madrasaName: '', principalName: '', address: '', phone: '',
+    email: '', description: '', admissionYear: new Date().getFullYear().toString(),
+    whatsappNumber: '', websiteUrl: ''
+  });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   // Modals & form states
@@ -95,8 +105,31 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings').then(r => r.json());
+      if (res.settings) setMadrasaSettings(res.settings);
+    } catch {}
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsSaving(true);
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(madrasaSettings)
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch {}
+    finally { setSettingsSaving(false); }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchSettings();
   }, []);
 
   // Filtered students
@@ -269,6 +302,7 @@ export default function AdminDashboardPage() {
           { id: 'attendance', label: "Attendance System", icon: Calendar },
           { id: 'classes', label: "Classes & Streaming", icon: Video },
           { id: 'certificates', label: "Certificates", icon: Award },
+          { id: 'settings', label: "Madrasa Settings", icon: Settings },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -965,6 +999,143 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 7: MADRASA SETTINGS */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-100 dark:border-islamic-border">
+            <span className="p-2 rounded-xl bg-tarbiyah-900/10 text-tarbiyah-800 dark:text-gold-400 border border-tarbiyah-200 dark:border-gold-500/30">
+              <School className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="text-lg font-bold text-tarbiyah-950 dark:text-white">Madrasa Settings</h3>
+              <p className="text-xs text-gray-500">Enter your madrasa's real information. This will appear throughout the app.</p>
+            </div>
+          </div>
+
+          {settingsSaved && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-sm font-semibold flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Settings saved successfully!
+            </div>
+          )}
+
+          <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Madrasa Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Noorul Hudha Arabic College"
+                value={madrasaSettings.madrasaName}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, madrasaName: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Principal / Headmaster Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Ustadh Abdul Rahman"
+                value={madrasaSettings.principalName}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, principalName: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="e.g. 9876543210"
+                value={madrasaSettings.phone}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, phone: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">WhatsApp Number</label>
+              <input
+                type="tel"
+                placeholder="e.g. +919876543210"
+                value={madrasaSettings.whatsappNumber}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, whatsappNumber: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. info@yourmadrasa.com"
+                value={madrasaSettings.email}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, email: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Admission Year</label>
+              <input
+                type="text"
+                placeholder="e.g. 2026"
+                value={madrasaSettings.admissionYear}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, admissionYear: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Address</label>
+              <input
+                type="text"
+                placeholder="e.g. Kottakkal Road, Malappuram, Kerala - 676505"
+                value={madrasaSettings.address}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, address: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Website URL</label>
+              <input
+                type="url"
+                placeholder="e.g. https://yourmadrasa.com"
+                value={madrasaSettings.websiteUrl}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, websiteUrl: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Madrasa Description</label>
+              <textarea
+                rows={3}
+                placeholder="Brief description about your madrasa shown on the homepage..."
+                value={madrasaSettings.description}
+                onChange={e => setMadrasaSettings({ ...madrasaSettings, description: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-islamic-border bg-gray-50 dark:bg-islamic-dark text-sm focus:outline-none focus:ring-2 focus:ring-tarbiyah-600 resize-none"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <button
+                type="submit"
+                disabled={settingsSaving}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-tarbiyah-800 hover:bg-tarbiyah-700 text-gold-300 font-bold text-sm shadow border border-gold-500/30 transition-all disabled:opacity-60"
+              >
+                <Save className="w-4 h-4" />
+                {settingsSaving ? 'Saving...' : 'Save Madrasa Settings'}
+              </button>
+            </div>
+
+          </form>
         </div>
       )}
 
