@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.tarbiyah_irshad_ce8f6b10.twa",
+    "sha256_cert_fingerprints": ["0B:D8:54:6C:E2:49:90:18:24:E2:F8:83:38:60:8C:1B:F9:7F:92:84:8D:6F:8C:73:2A:5A:26:96:65:1B:1E:C5"]
+  }
+}]
