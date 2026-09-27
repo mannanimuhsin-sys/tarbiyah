@@ -40,9 +40,9 @@ export default function AdminPage() {
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [settings, setSettings] = useState<MadrasaSettings>({
-    madrasaName: '', principalName: '', address: '', phone: '',
+    madrasaName: 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ', principalName: '', address: 'കേരളം', phone: '7559950633',
     email: '', description: '', admissionYear: new Date().getFullYear().toString(),
-    whatsappNumber: '', websiteUrl: ''
+    whatsappNumber: '7559950633', websiteUrl: ''
   });
 
   // Filter & Search states

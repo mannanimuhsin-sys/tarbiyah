@@ -40,14 +40,14 @@ const INITIAL_DATA: DatabaseData = {
   certificates: [],
   progressReports: [],
   settings: {
-    madrasaName: '',
+    madrasaName: 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ',
     principalName: '',
-    address: '',
-    phone: '',
+    address: 'കേരളം',
+    phone: '7559950633',
     email: '',
     description: '',
     admissionYear: new Date().getFullYear().toString(),
-    whatsappNumber: '',
+    whatsappNumber: '7559950633',
     websiteUrl: ''
   }
 };
@@ -360,10 +360,18 @@ export const db = {
   // Madrasa Settings
   getSettings: (): MadrasaSettings => {
     const data = loadDatabase();
-    return data.settings || {
-      madrasaName: '', principalName: '', address: '', phone: '',
-      email: '', description: '', admissionYear: '', whatsappNumber: '', websiteUrl: ''
+    const defaults: MadrasaSettings = {
+      madrasaName: 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ',
+      principalName: '',
+      address: 'കേരളം',
+      phone: '7559950633',
+      email: '',
+      description: '',
+      admissionYear: new Date().getFullYear().toString(),
+      whatsappNumber: '7559950633',
+      websiteUrl: ''
     };
+    return { ...defaults, ...(data.settings || {}) };
   },
   updateSettings: (settings: MadrasaSettings): MadrasaSettings => {
     const data = loadDatabase();

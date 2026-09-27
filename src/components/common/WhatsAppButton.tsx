@@ -22,8 +22,9 @@ export function WhatsAppButton() {
   }, []);
 
   // Clean phone number (strip spaces, dashes, parentheses)
-  const cleanNumber = whatsappNumber.replace(/[^0-9]/g, '');
-  const targetNumber = cleanNumber || '919876543210'; // Fallback if admin hasn't set one yet
+  const rawNumber = whatsappNumber || '7559950633';
+  const cleanNumber = rawNumber.replace(/[^0-9]/g, '');
+  const targetNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
 
   const messageText = encodeURIComponent(
     language === 'ml'
