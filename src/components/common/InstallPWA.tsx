@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Download, Smartphone, X, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 
 export function InstallPWA() {
+  const { user } = useAuth();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -80,7 +82,14 @@ export function InstallPWA() {
 
   return (
     <>
-      <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 animate-bounce-subtle">
+      <div 
+        className={`fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-50 animate-bounce-subtle max-w-[calc(100vw-1.5rem)]`}
+        style={{
+          bottom: user 
+            ? 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' 
+            : 'calc(1rem + env(safe-area-inset-bottom, 0px))'
+        }}
+      >
         <div className="bg-gradient-to-r from-tarbiyah-800 to-tarbiyah-900 text-white p-4 rounded-2xl shadow-2xl border-2 border-gold-400/40 flex items-center justify-between gap-3 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gold-400/20 border border-gold-400/50 flex items-center justify-center shrink-0 text-gold-300">

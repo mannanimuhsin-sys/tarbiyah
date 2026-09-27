@@ -31,6 +31,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -39,13 +40,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-islamic-lightBg dark:bg-islamic-dark text-gray-900 dark:text-gray-100 flex flex-col min-h-screen antialiased bg-islamic-stars">
+    <html lang="en" suppressHydrationWarning className="overflow-x-hidden">
+      <body className="bg-islamic-lightBg dark:bg-islamic-dark text-gray-900 dark:text-gray-100 flex flex-col min-h-screen min-h-[100dvh] antialiased bg-islamic-stars overflow-x-hidden">
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
               <Navbar />
-              <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-6">
+              <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-6 overflow-x-hidden">
                 {children}
               </main>
               <BottomNav />

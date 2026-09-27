@@ -21,17 +21,17 @@ export function RubElHizb({ className = "w-8 h-8 text-gold-500" }: { className?:
 
 export function BismillahBanner() {
   return (
-    <div className="flex flex-col items-center justify-center my-6 select-none">
-      <div className="flex items-center gap-3">
-        <div className="h-[1px] w-12 sm:w-24 bg-gradient-to-r from-transparent to-gold-500/60" />
-        <RubElHizb className="w-5 h-5 text-gold-500" />
-        <span className="font-arabic text-xl sm:text-2xl text-gold-600 dark:text-gold-400 font-bold tracking-wide">
+    <div className="flex flex-col items-center justify-center my-4 sm:my-6 select-none px-2 max-w-full overflow-hidden">
+      <div className="flex items-center justify-center gap-1.5 sm:gap-3 max-w-full">
+        <div className="h-[1px] w-6 sm:w-24 bg-gradient-to-r from-transparent to-gold-500/60 shrink" />
+        <RubElHizb className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500 shrink-0" />
+        <span className="font-arabic text-base sm:text-2xl text-gold-600 dark:text-gold-400 font-bold tracking-wide text-center">
           بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
         </span>
-        <RubElHizb className="w-5 h-5 text-gold-500" />
-        <div className="h-[1px] w-12 sm:w-24 bg-gradient-to-l from-transparent to-gold-500/60" />
+        <RubElHizb className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500 shrink-0" />
+        <div className="h-[1px] w-6 sm:w-24 bg-gradient-to-l from-transparent to-gold-500/60 shrink" />
       </div>
-      <p className="text-xs text-emerald-800/70 dark:text-emerald-300/60 mt-1 italic tracking-wider">
+      <p className="text-[10px] sm:text-xs text-emerald-800/70 dark:text-emerald-300/60 mt-1 italic tracking-wider text-center">
         In the name of Allah, the Most Gracious, the Most Merciful
       </p>
     </div>
