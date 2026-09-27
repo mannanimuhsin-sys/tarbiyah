@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 export async function GET() {
-  const programs = db.getPrograms();
+  const programs = await db.getPrograms();
   return NextResponse.json({ programs });
 }
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const { action, programId, studentId, ...progData } = body;
 
     if (action === 'participate' && programId && studentId) {
-      const ok = db.participateProgram(programId, studentId);
+      const ok = await db.participateProgram(programId, studentId);
       if (!ok) return NextResponse.json({ error: "Program not found" }, { status: 404 });
       return NextResponse.json({ success: true, message: "Registered for program successfully" });
     }
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title, category, startDate, and endDate are required" }, { status: 400 });
     }
 
-    const created = db.createProgram({
+    const created = await db.createProgram({
       title: progData.title,
       category: progData.category,
       description: progData.description || "",

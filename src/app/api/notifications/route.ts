@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const studentId = searchParams.get('studentId') || undefined;
-  const list = db.getNotifications(studentId);
+  const list = await db.getNotifications(studentId);
   return NextResponse.json({ notifications: list });
 }
 
@@ -13,7 +13,7 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { id } = body;
     if (id) {
-      db.markNotificationRead(id);
+      await db.markNotificationRead(id);
     }
     return NextResponse.json({ success: true });
   } catch (err) {

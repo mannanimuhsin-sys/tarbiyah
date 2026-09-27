@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 export async function GET() {
-  const teachers = db.getTeachers();
+  const teachers = await db.getTeachers();
   return NextResponse.json({ teachers });
 }
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Required teacher fields are missing" }, { status: 400 });
     }
 
-    const newTeacher = db.createTeacher({
+    const newTeacher = await db.createTeacher({
       fullName,
       email: email || `${fullName.toLowerCase().replace(/\s+/g, '')}@tarbiyah.edu`,
       mobileNumber,

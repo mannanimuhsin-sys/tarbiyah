@@ -5,12 +5,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const studentId = searchParams.get('studentId');
 
-  const students = db.getStudents();
-  const attendance = db.getAttendance();
-  const liveClasses = db.getLiveClasses();
-  const recordedClasses = db.getRecordedClasses();
-  const programs = db.getPrograms();
-  const reports = db.getProgressReports();
+  const students = await db.getStudents();
+  const attendance = await db.getAttendance();
+  const liveClasses = await db.getLiveClasses();
+  const recordedClasses = await db.getRecordedClasses();
+  const programs = await db.getPrograms();
+  const reports = await db.getProgressReports();
+  const certs = await db.getCertificates();
 
   if (studentId) {
     const studentReport = reports.find(r => r.studentId === studentId);
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
       liveClassesCount: liveClasses.length,
       recordedClassesCount: recordedClasses.length,
       upcomingProgramsCount: programs.filter(p => p.isActive).length,
-      totalCertificatesIssued: db.getCertificates().length
+      totalCertificatesIssued: certs.length
     },
     progressReports: reports,
     monthlyBreakdown: [

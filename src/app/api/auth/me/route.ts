@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
     let extraData = {};
     if (payload.role === 'student') {
-      const student = db.getStudentById(payload.id);
+      const student = await db.getStudentById(payload.id);
       if (student) {
         extraData = {
           gender: student.gender,

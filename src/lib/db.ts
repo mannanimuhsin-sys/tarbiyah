@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { 
   Student, 
   Teacher, 
@@ -12,354 +10,299 @@ import {
   ProgressReport,
   MadrasaSettings
 } from './types';
-
-interface DatabaseData {
-  students: Student[];
-  teachers: Teacher[];
-  liveClasses: LiveClass[];
-  recordedClasses: RecordedClass[];
-  attendance: AttendanceRecord[];
-  programs: Program[];
-  notifications: NotificationItem[];
-  certificates: Certificate[];
-  progressReports: ProgressReport[];
-  settings: MadrasaSettings;
-}
-
-const DB_DIR = path.join(process.cwd(), '.data');
-const DB_FILE = path.join(DB_DIR, 'tarbiyah_db.json');
-
-const INITIAL_DATA: DatabaseData = {
-  students: [],
-  teachers: [],
-  liveClasses: [],
-  recordedClasses: [],
-  attendance: [],
-  programs: [],
-  notifications: [],
-  certificates: [],
-  progressReports: [],
-  settings: {
-    madrasaName: 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ',
-    principalName: '',
-    address: 'കേരളം',
-    phone: '7559950633',
-    email: '',
-    description: '',
-    admissionYear: new Date().getFullYear().toString(),
-    whatsappNumber: '7559950633',
-    websiteUrl: ''
-  }
-};
-
-// Ensure directory and load or initialize data
-function loadDatabase(): DatabaseData {
-  try {
-    if (!fs.existsSync(DB_DIR)) {
-      fs.mkdirSync(DB_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(DB_FILE)) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(INITIAL_DATA, null, 2), 'utf-8');
-      return INITIAL_DATA;
-    }
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn("Falling back to in-memory initial data:", err);
-    return INITIAL_DATA;
-  }
-}
-
-function saveDatabase(data: DatabaseData): void {
-  try {
-    if (!fs.existsSync(DB_DIR)) {
-      fs.mkdirSync(DB_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
-    console.error("Failed to save database file:", err);
-  }
-}
+import { d1Query, d1Exec } from './d1';
 
 export const db = {
   // Students
-  getStudents: (): Student[] => {
-    return loadDatabase().students;
+  getStudents: async (): Promise<Student[]> => {
+    const rows = await d1Query<any>('SELECT * FROM students ORDER BY created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      fullName: r.full_name,
+      mobileNumber: r.mobile_number,
+      password: r.password,
+      gender: r.gender,
+      age: r.age,
+      address: r.address,
+      parentName: r.parent_name,
+      parentMobile: r.parent_mobile,
+      registrationStatus: r.registration_status,
+      currentLevel: r.current_level,
+      attendanceRate: r.attendance_rate,
+      enrollmentDate: r.created_at,
+      createdAt: r.created_at
+    }));
   },
-  getStudentById: (id: string): Student | undefined => {
-    return loadDatabase().students.find(s => s.id === id);
+
+  getStudentById: async (id: string): Promise<Student | undefined> => {
+    const rows = await d1Query<any>('SELECT * FROM students WHERE id = ? LIMIT 1', [id]);
+    if (!rows.length) return undefined;
+    const r = rows[0];
+    return {
+      id: r.id,
+      fullName: r.full_name,
+      mobileNumber: r.mobile_number,
+      password: r.password,
+      gender: r.gender,
+      age: r.age,
+      address: r.address,
+      parentName: r.parent_name,
+      parentMobile: r.parent_mobile,
+      registrationStatus: r.registration_status,
+      currentLevel: r.current_level,
+      attendanceRate: r.attendance_rate,
+      enrollmentDate: r.created_at,
+      createdAt: r.created_at
+    };
   },
-  getStudentByMobile: (mobile: string): Student | undefined => {
-    return loadDatabase().students.find(s => s.mobileNumber.trim() === mobile.trim());
+
+  getStudentByMobile: async (mobile: string): Promise<Student | undefined> => {
+    const clean = mobile.trim().replace(/\D/g, '');
+    const rows = await d1Query<any>('SELECT * FROM students WHERE mobile_number = ? LIMIT 1', [clean]);
+    if (!rows.length) return undefined;
+    const r = rows[0];
+    return {
+      id: r.id,
+      fullName: r.full_name,
+      mobileNumber: r.mobile_number,
+      password: r.password,
+      gender: r.gender,
+      age: r.age,
+      address: r.address,
+      parentName: r.parent_name,
+      parentMobile: r.parent_mobile,
+      registrationStatus: r.registration_status,
+      currentLevel: r.current_level,
+      attendanceRate: r.attendance_rate,
+      enrollmentDate: r.created_at,
+      createdAt: r.created_at
+    };
   },
-  createStudent: (studentData: Omit<Student, 'id' | 'createdAt' | 'registrationStatus' | 'currentSurah' | 'currentAyah' | 'hifzJuzCompleted' | 'currentLevel' | 'attendanceRate'>): { success: boolean; student?: Student; error?: string } => {
-    const data = loadDatabase();
-    // Unique mobile number check rule
-    const existing = data.students.find(s => s.mobileNumber.trim() === studentData.mobileNumber.trim());
+
+  createStudent: async (studentData: Omit<Student, 'id' | 'createdAt' | 'registrationStatus' | 'currentSurah' | 'currentAyah' | 'hifzJuzCompleted' | 'currentLevel' | 'attendanceRate'>): Promise<{ success: boolean; student?: Student; error?: string }> => {
+    const existing = await db.getStudentByMobile(studentData.mobileNumber);
     if (existing) {
-      return { success: false, error: "One mobile number can register only once. This number is already in use." };
+      return { success: false, error: "ഈ മൊബൈൽ നമ്പർ ഇതിനകം രജിസ്റ്റർ ചെയ്തിട്ടുണ്ട്." };
     }
 
-    const newStudent: Student = {
-      ...studentData,
-      id: `std-${Date.now().toString().slice(-6)}`,
-      registrationStatus: 'pending', // Default is Pending
-      enrollmentDate: new Date().toISOString(),
-      currentLevel: 'Beginner',
-      currentSurah: 1,
-      currentAyah: 1,
-      hifzJuzCompleted: 0,
-      attendanceRate: 0,
-      createdAt: new Date().toISOString()
+    const id = `std-${Date.now().toString().slice(-6)}`;
+    const now = new Date().toISOString();
+    const cleanMobile = studentData.mobileNumber.trim().replace(/\D/g, '');
+
+    await d1Exec(
+      `INSERT INTO students (id, full_name, mobile_number, password, gender, age, address, parent_name, parent_mobile, registration_status, current_level, attendance_rate, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        studentData.fullName,
+        cleanMobile,
+        studentData.password || '',
+        studentData.gender || 'male',
+        studentData.age || 10,
+        studentData.address || '',
+        studentData.parentName || '',
+        studentData.parentMobile || '',
+        'pending',
+        'Beginner',
+        0,
+        now
+      ]
+    );
+
+    return {
+      success: true,
+      student: {
+        ...studentData,
+        id,
+        mobileNumber: cleanMobile,
+        registrationStatus: 'pending',
+        enrollmentDate: now,
+        createdAt: now
+      }
     };
-
-    data.students.push(newStudent);
-    saveDatabase(data);
-    return { success: true, student: newStudent };
   },
-  updateStudentStatus: (id: string, status: 'approved' | 'rejected'): boolean => {
-    const data = loadDatabase();
-    const student = data.students.find(s => s.id === id);
-    if (!student) return false;
-    student.registrationStatus = status;
 
-    // Add notification
-    data.notifications.unshift({
-      id: `notif-${Date.now().toString().slice(-6)}`,
-      title: status === 'approved' ? "Registration Approved! 🎉" : "Registration Update",
-      message: status === 'approved' 
-        ? `Salam ${student.fullName}, your registration for Tarbiyah Islamic Education has been approved. You may now login and attend classes.`
-        : `Salam ${student.fullName}, your registration application could not be approved at this time. Please contact administration.`,
-      type: "system",
-      targetRole: "student",
-      studentId: student.id,
-      isRead: false,
-      createdAt: new Date().toISOString()
-    });
+  updateStudentStatus: async (id: string, status: 'approved' | 'rejected' | 'pending'): Promise<boolean> => {
+    return await d1Exec('UPDATE students SET registration_status = ? WHERE id = ?', [status, id]);
+  },
 
-    saveDatabase(data);
-    return true;
-  },
-  updateStudent: (id: string, updates: Partial<Student>): Student | null => {
-    const data = loadDatabase();
-    const index = data.students.findIndex(s => s.id === id);
-    if (index === -1) return null;
-    data.students[index] = { ...data.students[index], ...updates };
-    saveDatabase(data);
-    return data.students[index];
-  },
-  deleteStudent: (id: string): boolean => {
-    const data = loadDatabase();
-    const prevLen = data.students.length;
-    data.students = data.students.filter(s => s.id !== id);
-    if (data.students.length !== prevLen) {
-      saveDatabase(data);
-      return true;
+  updateStudent: async (id: string, updates: Partial<Student>): Promise<Student | null> => {
+    const fields: string[] = [];
+    const params: any[] = [];
+
+    if (updates.fullName !== undefined && updates.fullName.trim()) {
+      fields.push('full_name = ?');
+      params.push(updates.fullName.trim());
     }
-    return false;
-  },
-
-  // Teachers
-  getTeachers: (): Teacher[] => {
-    return loadDatabase().teachers;
-  },
-  createTeacher: (teacherData: Omit<Teacher, 'id' | 'createdAt'>): Teacher => {
-    const data = loadDatabase();
-    const newTeacher: Teacher = {
-      ...teacherData,
-      id: `tch-${Date.now().toString().slice(-6)}`,
-      createdAt: new Date().toISOString()
-    };
-    data.teachers.push(newTeacher);
-    saveDatabase(data);
-    return newTeacher;
-  },
-
-  // Live Classes
-  getLiveClasses: (): LiveClass[] => {
-    return loadDatabase().liveClasses;
-  },
-  createLiveClass: (classData: Omit<LiveClass, 'id'>): LiveClass => {
-    const data = loadDatabase();
-    const newClass: LiveClass = {
-      ...classData,
-      id: `live-${Date.now().toString().slice(-6)}`,
-    };
-    data.liveClasses.push(newClass);
-
-    // Send broadcast notification
-    data.notifications.unshift({
-      id: `notif-${Date.now().toString().slice(-6)}`,
-      title: `New Live Class Scheduled: ${newClass.title}`,
-      message: `Ustadh ${newClass.teacherName || 'ഉസ്താദ്'} will conduct ${newClass.title} via ${(newClass.provider || 'google_meet').toUpperCase()} at ${new Date(newClass.startTime).toLocaleString()}.`,
-      type: "class_reminder",
-      targetRole: "all",
-      isRead: false,
-      createdAt: new Date().toISOString()
-    });
-
-    saveDatabase(data);
-    return newClass;
-  },
-  deleteLiveClass: (id: string): boolean => {
-    const data = loadDatabase();
-    const prev = data.liveClasses.length;
-    data.liveClasses = data.liveClasses.filter(c => c.id !== id);
-    if (data.liveClasses.length !== prev) {
-      saveDatabase(data);
-      return true;
+    if (updates.password !== undefined && updates.password.trim()) {
+      fields.push('password = ?');
+      params.push(updates.password.trim());
     }
-    return false;
+    if (updates.registrationStatus !== undefined) {
+      fields.push('registration_status = ?');
+      params.push(updates.registrationStatus);
+    }
+    if (updates.parentName !== undefined) {
+      fields.push('parent_name = ?');
+      params.push(updates.parentName);
+    }
+    if (updates.parentMobile !== undefined) {
+      fields.push('parent_mobile = ?');
+      params.push(updates.parentMobile);
+    }
+    if (updates.address !== undefined) {
+      fields.push('address = ?');
+      params.push(updates.address);
+    }
+    if (updates.age !== undefined) {
+      fields.push('age = ?');
+      params.push(updates.age);
+    }
+    if (updates.gender !== undefined) {
+      fields.push('gender = ?');
+      params.push(updates.gender);
+    }
+
+    if (!fields.length) return await db.getStudentById(id) || null;
+
+    params.push(id);
+    await d1Exec(`UPDATE students SET ${fields.join(', ')} WHERE id = ?`, params);
+    return await db.getStudentById(id) || null;
   },
 
-  // Recorded Classes
-  getRecordedClasses: (): RecordedClass[] => {
-    return loadDatabase().recordedClasses;
+  deleteStudent: async (id: string): Promise<boolean> => {
+    await d1Exec('DELETE FROM attendance WHERE student_id = ?', [id]);
+    return await d1Exec('DELETE FROM students WHERE id = ?', [id]);
   },
-  createRecordedClass: (recordedData: Omit<RecordedClass, 'id' | 'viewsCount' | 'createdAt'>): RecordedClass => {
-    const data = loadDatabase();
-    const newRecord: RecordedClass = {
-      ...recordedData,
-      id: `rec-${Date.now().toString().slice(-6)}`,
-      viewsCount: 1,
-      createdAt: new Date().toISOString()
-    };
-    data.recordedClasses.unshift(newRecord);
-    saveDatabase(data);
-    return newRecord;
+
+  // Live Classes (Google Meet)
+  getLiveClasses: async (): Promise<LiveClass[]> => {
+    const rows = await d1Query<any>('SELECT * FROM live_classes ORDER BY start_time DESC');
+    return rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      meetingLink: r.meeting_link,
+      startTime: r.start_time,
+      durationMinutes: r.duration_minutes,
+      provider: r.provider || 'google_meet',
+      level: r.level,
+      description: r.description,
+      status: 'scheduled'
+    }));
   },
-  deleteRecordedClass: (id: string): boolean => {
-    const data = loadDatabase();
-    const prev = data.recordedClasses.length;
-    data.recordedClasses = data.recordedClasses.filter(c => c.id !== id);
-    if (data.recordedClasses.length !== prev) {
-      saveDatabase(data);
-      return true;
-    }
-    return false;
+
+  createLiveClass: async (classData: Omit<LiveClass, 'id'>): Promise<LiveClass> => {
+    const id = `live-${Date.now().toString().slice(-6)}`;
+    const now = new Date().toISOString();
+
+    await d1Exec(
+      `INSERT INTO live_classes (id, title, meeting_link, start_time, duration_minutes, provider, level, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        classData.title,
+        classData.meetingLink,
+        classData.startTime,
+        classData.durationMinutes || 45,
+        classData.provider || 'google_meet',
+        classData.level || 'All Levels',
+        classData.description || '',
+        now
+      ]
+    );
+
+    return { ...classData, id, status: 'scheduled' };
+  },
+
+  deleteLiveClass: async (id: string): Promise<boolean> => {
+    return await d1Exec('DELETE FROM live_classes WHERE id = ?', [id]);
+  },
+
+  // Recorded Classes (YouTube)
+  getRecordedClasses: async (): Promise<RecordedClass[]> => {
+    const rows = await d1Query<any>('SELECT * FROM recorded_classes ORDER BY created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      classNumber: r.class_number,
+      youtubeUrl: r.youtube_url,
+      videoUrl: r.video_url,
+      subject: r.subject,
+      level: r.level,
+      teacherName: r.teacher_name,
+      createdAt: r.created_at
+    }));
+  },
+
+  createRecordedClass: async (recordedData: Omit<RecordedClass, 'id' | 'viewsCount' | 'createdAt'>): Promise<RecordedClass> => {
+    const id = `rec-${Date.now().toString().slice(-6)}`;
+    const now = new Date().toISOString();
+
+    await d1Exec(
+      `INSERT INTO recorded_classes (id, title, description, class_number, youtube_url, video_url, subject, level, teacher_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        recordedData.title,
+        recordedData.description || '',
+        recordedData.classNumber || 'ക്ലാസ് 1',
+        recordedData.youtubeUrl || '',
+        recordedData.videoUrl || '',
+        recordedData.subject || 'islamic_studies',
+        recordedData.level || 'All Levels',
+        recordedData.teacherName || 'ഉസ്താദ്',
+        now
+      ]
+    );
+
+    return { ...recordedData, id, createdAt: now };
+  },
+
+  deleteRecordedClass: async (id: string): Promise<boolean> => {
+    return await d1Exec('DELETE FROM recorded_classes WHERE id = ?', [id]);
   },
 
   // Attendance
-  getAttendance: (): AttendanceRecord[] => {
-    return loadDatabase().attendance;
+  getAttendance: async (): Promise<AttendanceRecord[]> => {
+    const rows = await d1Query<any>('SELECT * FROM attendance ORDER BY date DESC');
+    return rows.map(r => ({
+      id: r.id,
+      studentId: r.student_id,
+      studentName: r.student_name,
+      date: r.date,
+      status: r.status,
+      remarks: r.remarks,
+      markedBy: r.marked_by
+    }));
   },
-  deleteAttendance: (id: string): boolean => {
-    const data = loadDatabase();
-    const prev = data.attendance.length;
-    data.attendance = data.attendance.filter(a => a.id !== id);
-    if (data.attendance.length !== prev) {
-      saveDatabase(data);
-      return true;
-    }
-    return false;
-  },
-  markAttendance: (record: Omit<AttendanceRecord, 'id'>): AttendanceRecord => {
-    const data = loadDatabase();
-    const existingIndex = data.attendance.findIndex(
-      a => a.studentId === record.studentId && a.date === record.date
+
+  markAttendance: async (record: Omit<AttendanceRecord, 'id'>): Promise<AttendanceRecord> => {
+    const existing = await d1Query<any>(
+      'SELECT id FROM attendance WHERE student_id = ? AND date = ? LIMIT 1', 
+      [record.studentId, record.date]
     );
-
-    let resultRecord: AttendanceRecord;
-    if (existingIndex >= 0) {
-      data.attendance[existingIndex] = { ...data.attendance[existingIndex], ...record };
-      resultRecord = data.attendance[existingIndex];
-    } else {
-      resultRecord = {
-        ...record,
-        id: `att-${Date.now().toString().slice(-6)}`
-      };
-      data.attendance.unshift(resultRecord);
-    }
-
-    // Recalculate student attendance rate
-    const studentRecords = data.attendance.filter(a => a.studentId === record.studentId);
-    const presentCount = studentRecords.filter(a => a.status === 'present' || a.status === 'late').length;
-    const rate = Math.round((presentCount / studentRecords.length) * 100 * 10) / 10;
     
-    const std = data.students.find(s => s.id === record.studentId);
-    if (std) {
-      std.attendanceRate = rate;
+    let id = existing.length > 0 ? existing[0].id : `att-${Date.now().toString().slice(-6)}`;
+
+    if (existing.length > 0) {
+      await d1Exec(
+        'UPDATE attendance SET status = ?, remarks = ?, marked_by = ? WHERE id = ?',
+        [record.status, record.remarks || '', record.markedBy || 'Admin', id]
+      );
+    } else {
+      await d1Exec(
+        'INSERT INTO attendance (id, student_id, student_name, date, status, remarks, marked_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, record.studentId, record.studentName || 'Student', record.date, record.status, record.remarks || '', record.markedBy || 'Admin']
+      );
     }
 
-    saveDatabase(data);
-    return resultRecord;
+    return { ...record, id };
   },
 
-  // Programs & Musabaqa
-  getPrograms: (): Program[] => {
-    return loadDatabase().programs;
-  },
-  createProgram: (prog: Omit<Program, 'id'>): Program => {
-    const data = loadDatabase();
-    const newProg: Program = {
-      ...prog,
-      id: `prg-${Date.now().toString().slice(-6)}`,
-      registeredStudentIds: []
-    };
-    data.programs.push(newProg);
-    saveDatabase(data);
-    return newProg;
-  },
-  participateProgram: (programId: string, studentId: string): boolean => {
-    const data = loadDatabase();
-    const prog = data.programs.find(p => p.id === programId);
-    if (!prog) return false;
-    if (!prog.registeredStudentIds) prog.registeredStudentIds = [];
-    if (!prog.registeredStudentIds.includes(studentId)) {
-      prog.registeredStudentIds.push(studentId);
-      saveDatabase(data);
-    }
-    return true;
-  },
-
-  // Notifications
-  getNotifications: (studentId?: string): NotificationItem[] => {
-    const data = loadDatabase();
-    if (!studentId) return data.notifications;
-    return data.notifications.filter(n => n.targetRole === 'all' || n.studentId === studentId);
-  },
-  markNotificationRead: (id: string): void => {
-    const data = loadDatabase();
-    const notif = data.notifications.find(n => n.id === id);
-    if (notif) {
-      notif.isRead = true;
-      saveDatabase(data);
-    }
-  },
-
-  // Certificates
-  getCertificates: (): Certificate[] => {
-    return loadDatabase().certificates;
-  },
-  getCertificatesByStudent: (studentId: string): Certificate[] => {
-    return loadDatabase().certificates.filter(c => c.studentId === studentId);
-  },
-  createCertificate: (certData: Omit<Certificate, 'id' | 'verificationCode' | 'qrCodeData'>): Certificate => {
-    const data = loadDatabase();
-    const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const verificationCode = `TRB-VERIF-${randomHex}`;
-    const newCert: Certificate = {
-      ...certData,
-      id: `cert-${Date.now().toString().slice(-6)}`,
-      verificationCode,
-      qrCodeData: `https://tarbiyah.edu/verify/${verificationCode}`
-    };
-    data.certificates.push(newCert);
-    saveDatabase(data);
-    return newCert;
-  },
-
-  // Reports
-  getProgressReports: (): ProgressReport[] => {
-    return loadDatabase().progressReports;
-  },
-  getStudentReport: (studentId: string): ProgressReport | undefined => {
-    return loadDatabase().progressReports.find(r => r.studentId === studentId);
+  deleteAttendance: async (id: string): Promise<boolean> => {
+    return await d1Exec('DELETE FROM attendance WHERE id = ?', [id]);
   },
 
   // Madrasa Settings
-  getSettings: (): MadrasaSettings => {
-    const data = loadDatabase();
+  getSettings: async (): Promise<MadrasaSettings> => {
     const defaults: MadrasaSettings = {
       madrasaName: 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ',
       principalName: '',
@@ -367,16 +310,68 @@ export const db = {
       phone: '7559950633',
       email: '',
       description: '',
-      admissionYear: new Date().getFullYear().toString(),
+      admissionYear: '2026',
       whatsappNumber: '7559950633',
       websiteUrl: ''
     };
-    return { ...defaults, ...(data.settings || {}) };
+
+    const rows = await d1Query<any>('SELECT * FROM madrasa_settings WHERE id = ? LIMIT 1', ['main_settings']);
+    if (!rows.length) return defaults;
+    const r = rows[0];
+
+    return {
+      madrasaName: r.madrasa_name || defaults.madrasaName,
+      principalName: r.principal_name || defaults.principalName,
+      address: r.address || defaults.address,
+      phone: r.phone || defaults.phone,
+      email: r.email || defaults.email,
+      description: r.description || defaults.description,
+      admissionYear: r.admission_year || defaults.admissionYear,
+      whatsappNumber: r.whatsapp_number || defaults.whatsappNumber,
+      websiteUrl: r.website_url || defaults.websiteUrl
+    };
   },
-  updateSettings: (settings: MadrasaSettings): MadrasaSettings => {
-    const data = loadDatabase();
-    data.settings = settings;
-    saveDatabase(data);
-    return settings;
-  }
+
+  updateSettings: async (s: MadrasaSettings): Promise<MadrasaSettings> => {
+    await d1Exec(
+      `INSERT INTO madrasa_settings (id, madrasa_name, principal_name, address, phone, email, description, admission_year, whatsapp_number, website_url)
+       VALUES ('main_settings', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         madrasa_name = excluded.madrasa_name,
+         principal_name = excluded.principal_name,
+         address = excluded.address,
+         phone = excluded.phone,
+         email = excluded.email,
+         description = excluded.description,
+         admission_year = excluded.admission_year,
+         whatsapp_number = excluded.whatsapp_number,
+         website_url = excluded.website_url`,
+      [
+        s.madrasaName || 'നൂറുൽ ഹുദാ ഇസ്ലാമിക് മദ്റസ',
+        s.principalName || '',
+        s.address || '',
+        s.phone || '7559950633',
+        s.email || '',
+        s.description || '',
+        s.admissionYear || '2026',
+        s.whatsappNumber || '7559950633',
+        s.websiteUrl || ''
+      ]
+    );
+    return s;
+  },
+
+  // Fallbacks for optional sections
+  getTeachers: async (): Promise<Teacher[]> => [],
+  createTeacher: async (teacherData: any): Promise<Teacher> => ({ ...teacherData, id: `tch-${Date.now().toString().slice(-6)}`, createdAt: new Date().toISOString() }),
+  getPrograms: async (): Promise<Program[]> => [],
+  createProgram: async (p: any): Promise<Program> => ({ ...p, id: `prg-${Date.now().toString().slice(-6)}` }),
+  participateProgram: async (programId?: string, studentId?: string) => true,
+  getNotifications: async (studentId?: string): Promise<NotificationItem[]> => [],
+  markNotificationRead: async (id?: string) => {},
+  getCertificates: async (): Promise<Certificate[]> => [],
+  getCertificatesByStudent: async (studentId?: string) => [],
+  createCertificate: async (cert: any): Promise<Certificate> => ({ ...cert, id: `cert-${Date.now().toString().slice(-6)}`, verificationCode: 'TRB-001' }),
+  getProgressReports: async (): Promise<ProgressReport[]> => [],
+  getStudentReport: async (studentId?: string) => undefined
 };

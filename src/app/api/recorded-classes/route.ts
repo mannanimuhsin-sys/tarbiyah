@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const classNumber = searchParams.get('classNumber');
 
-    let list = db.getRecordedClasses();
+    let list = await db.getRecordedClasses();
 
     if (classNumber && classNumber !== 'all') {
       list = list.filter(v => v.classNumber === classNumber);
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title and YouTube Video URL are required." }, { status: 400 });
     }
 
-    const created = db.createRecordedClass({
+    const created = await db.createRecordedClass({
       title,
       description: description || "ക്ലാസ് വിവരണം നൽകിയിട്ടില്ല.",
       classNumber: classNumber || "ക്ലാസ് 1",
@@ -77,7 +77,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Class ID is required" }, { status: 400 });
     }
 
-    const success = db.deleteRecordedClass(id);
+    const success = await db.deleteRecordedClass(id);
     if (!success) {
       return NextResponse.json({ error: "Class not found or already deleted" }, { status: 404 });
     }

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     }
 
     // Call DB creation which validates uniqueness
-    const result = db.createStudent({
+    const result = await db.createStudent({
       fullName: fullName.trim(),
       mobileNumber: cleanMobile,
       password: password,

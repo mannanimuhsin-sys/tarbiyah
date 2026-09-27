@@ -7,17 +7,18 @@ export async function GET(req: Request) {
   const code = searchParams.get('code');
 
   if (code) {
-    const cert = db.getCertificates().find(c => c.verificationCode === code);
+    const certs = await db.getCertificates();
+    const cert = certs.find(c => c.verificationCode === code);
     if (!cert) return NextResponse.json({ error: "Certificate verification failed. Code not found." }, { status: 404 });
     return NextResponse.json({ verified: true, certificate: cert });
   }
 
   if (studentId) {
-    const list = db.getCertificatesByStudent(studentId);
+    const list = await db.getCertificatesByStudent(studentId);
     return NextResponse.json({ certificates: list });
   }
 
-  return NextResponse.json({ certificates: db.getCertificates() });
+  return NextResponse.json({ certificates: await db.getCertificates() });
 }
 
 export async function POST(req: Request) {
@@ -29,14 +30,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "studentId and courseOrAchievement are required" }, { status: 400 });
     }
 
-    const student = db.getStudentById(studentId);
+    const student = await db.getStudentById(studentId);
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     const certNum = `TRB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const newCert = db.createCertificate({
+    const newCert = await db.createCertificate({
       certificateNumber: certNum,
       studentId: student.id,
       studentName: student.fullName,

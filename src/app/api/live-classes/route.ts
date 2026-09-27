@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    const classes = db.getLiveClasses();
+    const classes = await db.getLiveClasses();
     return NextResponse.json({ classes });
   } catch (err) {
     return NextResponse.json({ error: "Failed to retrieve live classes" }, { status: 500 });
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title, Google Meet link, and Date & Time are required" }, { status: 400 });
     }
 
-    const created = db.createLiveClass({
+    const created = await db.createLiveClass({
       title,
       meetingLink: meetingLink.trim(),
       startTime: startTime.trim(),
@@ -48,7 +48,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Live Class ID is required" }, { status: 400 });
     }
 
-    const success = db.deleteLiveClass(id);
+    const success = await db.deleteLiveClass(id);
     if (!success) {
       return NextResponse.json({ error: "Live class not found or already deleted" }, { status: 404 });
     }

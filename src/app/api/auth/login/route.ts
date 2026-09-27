@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // 2. Student Authentication Check
     if (mobileNumber) {
       const cleanMobile = mobileNumber.toString().replace(/\D/g, '');
-      const student = db.getStudentByMobile(cleanMobile);
+      const student = await db.getStudentByMobile(cleanMobile);
 
       if (!student) {
         return NextResponse.json({ error: "No student registered with this mobile number." }, { status: 404 });

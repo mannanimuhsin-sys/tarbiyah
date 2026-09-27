@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     const studentId = searchParams.get('studentId');
     const date = searchParams.get('date');
 
-    let list = db.getAttendance();
+    let list = await db.getAttendance();
 
     if (studentId) {
       list = list.filter(a => a.studentId === studentId);
@@ -50,8 +50,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "studentId, date, and status are required" }, { status: 400 });
     }
 
-    const student = db.getStudentById(studentId);
-    const saved = db.markAttendance({
+    const student = await db.getStudentById(studentId);
+    const saved = await db.markAttendance({
       studentId,
       studentName: student ? student.fullName : 'Student',
       date,
@@ -75,7 +75,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Attendance Record ID is required" }, { status: 400 });
     }
 
-    const success = db.deleteAttendance(id);
+    const success = await db.deleteAttendance(id);
     if (!success) {
       return NextResponse.json({ error: "Record not found or already deleted" }, { status: 404 });
     }

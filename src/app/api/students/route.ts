@@ -9,14 +9,15 @@ export async function GET(req: Request) {
     const id = searchParams.get('id');
 
     if (id) {
-      const student = db.getStudentById(id);
+      const student = await db.getStudentById(id);
       if (!student) {
         return NextResponse.json({ error: "Student not found" }, { status: 404 });
       }
       return NextResponse.json({ student });
     }
 
-    let students = db.getStudents();
+    const allStudents = await db.getStudents();
+    let students = [...allStudents];
 
     if (status && status !== 'all') {
       students = students.filter(s => s.registrationStatus === status);
@@ -33,10 +34,10 @@ export async function GET(req: Request) {
     return NextResponse.json({
       students,
       stats: {
-        total: db.getStudents().length,
-        approved: db.getStudents().filter(s => s.registrationStatus === 'approved').length,
-        pending: db.getStudents().filter(s => s.registrationStatus === 'pending').length,
-        rejected: db.getStudents().filter(s => s.registrationStatus === 'rejected').length,
+        total: allStudents.length,
+        approved: allStudents.filter(s => s.registrationStatus === 'approved').length,
+        pending: allStudents.filter(s => s.registrationStatus === 'pending').length,
+        rejected: allStudents.filter(s => s.registrationStatus === 'rejected').length,
       }
     });
   } catch (err) {
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const result = db.createStudent(body);
+    const result = await db.createStudent(body);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -89,7 +90,7 @@ export async function PATCH(req: Request) {
     // "വിദ്യാർത്ഥികൾക്ക് അവരുടെ പാസ്വേഡുകൾ എഡിറ്റ് പേരുകൾ എഡിറ്റ് ചെയ്യാൻ ഉള്ള ഓപ്ഷൻ വേണം നമ്പർ ഒരിക്കലും എഡിറ്റ് ചെയ്യാൻ പാടില്ല അത് ഫിക്സഡ് ആയിരിക്കണം"
     delete (updates as any).mobileNumber;
 
-    const updated = db.updateStudent(id, updates);
+    const updated = await db.updateStudent(id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
@@ -109,7 +110,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Student ID is required" }, { status: 400 });
     }
 
-    const success = db.deleteStudent(id);
+    const success = await db.deleteStudent(id);
     if (!success) {
       return NextResponse.json({ error: "Student not found or already deleted" }, { status: 404 });
     }

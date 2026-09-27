@@ -5,7 +5,7 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const student = db.getStudentById(params.id);
+  const student = await db.getStudentById(params.id);
   if (!student) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
@@ -21,18 +21,18 @@ export async function PATCH(
     const { action, status, ...updates } = body;
 
     if (action === 'approve') {
-      const ok = db.updateStudentStatus(params.id, 'approved');
+      const ok = await db.updateStudentStatus(params.id, 'approved');
       if (!ok) return NextResponse.json({ error: "Student not found" }, { status: 404 });
       return NextResponse.json({ success: true, message: "Student approved successfully" });
     }
 
     if (action === 'reject') {
-      const ok = db.updateStudentStatus(params.id, 'rejected');
+      const ok = await db.updateStudentStatus(params.id, 'rejected');
       if (!ok) return NextResponse.json({ error: "Student not found" }, { status: 404 });
       return NextResponse.json({ success: true, message: "Student rejected" });
     }
 
-    const updated = db.updateStudent(params.id, updates);
+    const updated = await db.updateStudent(params.id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
@@ -46,7 +46,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const deleted = db.deleteStudent(params.id);
+  const deleted = await db.deleteStudent(params.id);
   if (!deleted) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
